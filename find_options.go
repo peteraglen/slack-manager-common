@@ -3,33 +3,33 @@ package common
 type FindOption func(*FindOptions)
 
 type FindOptions struct {
-	equals    map[string]interface{}
-	notEquals map[string]interface{}
+	fieldEquals    map[string]interface{}
+	fieldNotEquals map[string]interface{}
 }
 
 func NewFindOptions() *FindOptions {
 	return &FindOptions{
-		equals:    make(map[string]interface{}),
-		notEquals: make(map[string]interface{}),
+		fieldEquals:    make(map[string]interface{}),
+		fieldNotEquals: make(map[string]interface{}),
 	}
 }
 
-func WithKeyEquals(key string, value interface{}) FindOption {
+func WithFieldEquals(field string, value interface{}) FindOption {
 	return func(o *FindOptions) {
-		o.equals[key] = value
+		o.fieldEquals[field] = value
 	}
 }
 
-func WithKeyNotEquals(key string, value interface{}) FindOption {
+func WithFieldNotEquals(field string, value interface{}) FindOption {
 	return func(o *FindOptions) {
-		o.notEquals[key] = value
+		o.fieldNotEquals[field] = value
 	}
 }
 
-func (o *FindOptions) Equals() map[string]interface{} {
-	return o.equals
+func (o *FindOptions) FieldEquals() map[string]interface{} {
+	return o.fieldEquals
 }
 
-func (o *FindOptions) NotEquals() map[string]interface{} {
-	return o.notEquals
+func (o *FindOptions) FieldNotEquals() map[string]interface{} {
+	return o.fieldNotEquals
 }
