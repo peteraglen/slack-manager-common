@@ -1,6 +1,8 @@
 package common
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -40,6 +42,7 @@ type Alert struct {
 	// CorrelationID is an optional field used to group related alerts together.
 	// If unset, the correlation ID is constructed by hashing [Header, Text, Author, Host, SlackChannelID].
 	// It is strongly recommended to set this to an explicit value, which makes sense in your context, rather than relying on the default hash value.
+	// With a custom correlation ID, you can update both header and text without creating a new issue.
 	CorrelationID string `json:"correlationId"`
 
 	// Type is the type of alert, such as 'compliance', 'security' or 'metrics'.
@@ -49,6 +52,7 @@ type Alert struct {
 
 	// Header is the main header (title) of the alert.
 	// It is automatically truncated to 130 characters.
+	// Include :status: in the header (or text) to have it replaced with the appropriate emoji for the alert severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Header string `json:"header"`
 
@@ -59,6 +63,7 @@ type Alert struct {
 
 	// Text is the main text (body) of the alert.
 	// It is automatically truncated to 10000 characters.
+	// Include :status: in the text (or header) to have it replaced with the appropriate emoji for the alert severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Text string `json:"text"`
 
@@ -187,6 +192,10 @@ func NewAlert(severity AlertSeverity) *Alert {
 		Severity:  severity,
 		Metadata:  make(map[string]interface{}),
 	}
+}
+
+func (a *Alert) DedupID() string {
+	return hash("alert", a.SlackChannelID, a.RouteKey, a.CorrelationID, a.Timestamp.Format(time.RFC3339Nano), a.Header, a.Text)
 }
 
 func (a *Alert) Clean() {
@@ -662,4 +671,16 @@ func shortenAlertTextIfNeeded(text string) string {
 	}
 
 	return strings.TrimSpace(text[:MaxTextLength-3]) + "..."
+}
+
+func hash(input ...string) string {
+	h := sha256.New()
+
+	for _, s := range input {
+		h.Write([]byte(s))
+	}
+
+	bs := h.Sum(nil)
+
+	return base64.URLEncoding.EncodeToString(bs)
 }
