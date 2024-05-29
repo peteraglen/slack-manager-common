@@ -384,61 +384,53 @@ func TestAlertValidation(t *testing.T) {
 		assert.NoError(t, a.Validate())
 	})
 
-	t.Run("alert.slackChannelID is required when routeKey is empty", func(t *testing.T) {
-		a := &Alert{
-			Header: "foo",
-		}
-		a.Clean()
-		assert.ErrorContains(t, a.Validate(), "slackChannelId")
-	})
-
 	t.Run("alert.slackChannelID and alert.routeKey should be on the correct format", func(t *testing.T) {
-		a := &Alert{SlackChannelID: "abcdefghi"}
+		a := &Alert{SlackChannelID: "abcdefghi", Header: "foo"}
 		a.Clean()
-		assert.NoError(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.NoError(t, a.Validate())
 
-		a = &Alert{SlackChannelID: "ABab129cf"}
+		a = &Alert{SlackChannelID: "ABab129cf", Header: "foo"}
 		a.Clean()
-		assert.NoError(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.NoError(t, a.Validate())
 
-		a = &Alert{SlackChannelID: "abcdefghi9238yr"}
+		a = &Alert{SlackChannelID: "abcdefghi9238yr", Header: "foo"}
 		a.Clean()
-		assert.NoError(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.NoError(t, a.Validate())
 
-		// Empty is not allowed
-		a = &Alert{SlackChannelID: ""}
+		// Channel ID and route key can both be empty
+		a = &Alert{Header: "foo"}
 		a.Clean()
-		assert.Error(t, a.ValidateSlackChannelIDAndRouteKey())
-
-		// Channel names are allowed
-		a = &Alert{SlackChannelID: "12345678"}
-		a.Clean()
-		assert.NoError(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.NoError(t, a.Validate())
 
 		// Channel names are allowed
-		a = &Alert{SlackChannelID: "foo-something"}
+		a = &Alert{SlackChannelID: "12345678", Header: "foo"}
 		a.Clean()
-		assert.NoError(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.NoError(t, a.Validate())
+
+		// Channel names are allowed
+		a = &Alert{SlackChannelID: "foo-something", Header: "foo"}
+		a.Clean()
+		assert.NoError(t, a.Validate())
 
 		// Invalid characters
-		a = &Alert{SlackChannelID: "sdkjsdf asdfasdf"}
+		a = &Alert{SlackChannelID: "sdkjsdf asdfasdf", Header: "foo"}
 		a.Clean()
-		assert.Error(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.Error(t, a.Validate())
 
 		// Too long channelID
-		a = &Alert{SlackChannelID: randString(MaxSlackChannelIDLength+1, randGen)}
+		a = &Alert{SlackChannelID: randString(MaxSlackChannelIDLength+1, randGen), Header: "foo"}
 		a.Clean()
-		assert.Error(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.Error(t, a.Validate())
 
 		// routeKey is OK
-		a = &Alert{RouteKey: "abcdefghi"}
+		a = &Alert{RouteKey: "abcdefghi", Header: "foo"}
 		a.Clean()
-		assert.NoError(t, a.ValidateSlackChannelIDAndRouteKey())
+		assert.NoError(t, a.Validate())
 
 		// routeKey too long
-		a = &Alert{RouteKey: randString(MaxRouteKeyLength+1, randGen)}
+		a = &Alert{RouteKey: randString(MaxRouteKeyLength+1, randGen), Header: "foo"}
 		a.Clean()
-		assert.ErrorContains(t, a.ValidateSlackChannelIDAndRouteKey(), "routeKey")
+		assert.ErrorContains(t, a.Validate(), "routeKey")
 	})
 
 	t.Run("alert.header and alert.text cannot both be empty", func(t *testing.T) {

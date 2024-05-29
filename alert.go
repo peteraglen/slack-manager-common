@@ -418,10 +418,6 @@ func (a *Alert) ValidateSlackChannelIDAndRouteKey() error {
 		return nil
 	}
 
-	if a.RouteKey == "" {
-		return errors.New("slackChannelId and routeKey cannot both be empty")
-	}
-
 	if len(a.RouteKey) > MaxRouteKeyLength {
 		return fmt.Errorf("routeKey is too long, expected length <=%d", MaxRouteKeyLength)
 	}
