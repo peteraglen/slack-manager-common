@@ -63,52 +63,80 @@ type Alert struct {
 	Type string `json:"type"`
 
 	// Header is the main header (title) of the alert.
-	// It is automatically truncated at 130 characters.
+	// It is automatically truncated at MaxHeaderLength characters.
 	// Include :status: in the header (or text) to have it replaced with the appropriate emoji for the alert severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Header string `json:"header"`
 
 	// HeaderWhenResolved is the main header (title) of the alert when in the *resolved* state.
-	// It is automatically truncated at 130 characters.
+	// It is automatically truncated at MaxHeaderLength characters.
 	// This field is optional. If unset, the Header field is used for all alert states.
 	HeaderWhenResolved string `json:"headerWhenResolved"`
 
 	// Text is the main text (body) of the alert.
-	// It is automatically truncated at 10000 characters.
+	// It is automatically truncated at MaxTextLength characters.
 	// Include :status: in the text (or header) to have it replaced with the appropriate emoji for the alert severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Text string `json:"text"`
 
 	// TextWhenResolved is the main text (body) of the alert when in the *resolved* state.
-	// It is automatically truncated at 10000 characters.
+	// It is automatically truncated at MaxTextLength characters.
 	// This field is optional. If unset, the Text field is used for all alert states.
 	TextWhenResolved string `json:"textWhenResolved"`
 
 	// FallbackText is the text displayed in Slack notifications.
 	// It should be a short, human-readable summary of the alert, without markdown or line breaks.
-	// It is automatically truncated at 150 characters.
+	// It is automatically truncated at MaxFallbackTextLength characters.
 	// This field is optional. If unset, Slack decides what to display in notifications (which may not always be ideal).
 	FallbackText string `json:"fallbackText"`
 
 	// Author is the 'author' of the alert (if relevant), displayed as a context block in the Slack post.
-	// It is automatically truncated at 100 characters.
+	// It is automatically truncated at MaxAuthorLength characters.
 	// This field is optional.
 	Author string `json:"author"`
 
 	// Host is the 'host' on which the alert originated (if any), displayed as a context block in the Slack post.
-	// It is automatically truncated at 100 characters.
+	// It is automatically truncated at MaxHostLength characters.
 	// This field is optional.
-	Host                      string        `json:"host"`
-	Footer                    string        `json:"footer"`
-	Link                      string        `json:"link"`
-	AutoResolveSeconds        int           `json:"autoResolveSeconds"`
-	AutoResolveAsInconclusive bool          `json:"autoResolveAsInconclusive"`
-	Severity                  AlertSeverity `json:"severity"`
-	SlackChannelID            string        `json:"slackChannelId"`
-	RouteKey                  string        `json:"routeKey"`
-	IssueFollowUpEnabled      bool          `json:"issueFollowUpEnabled"`
-	Username                  string        `json:"username"`
-	IconEmoji                 string        `json:"iconEmoji"`
+	Host string `json:"host"`
+
+	// Footer is the 'footer' of the alert, displayed as a context block at the bottom of the Slack post.
+	// It is automatically truncated at MaxFooterLength characters.
+	// This field is optional.
+	Footer string `json:"footer"`
+
+	// Link is an optional link (url) to more information about the alert, displayed as a context block in the Slack post.
+	// This field is optional, but if set, it must be a valid absolute URL, starting with http:// or https://
+	Link string `json:"link"`
+
+	// IssueFollowUpEnabled is a flag that determines if the alert should be automatically resolved after a certain time.
+	// If set to true, the alert will be resolved after AutoResolveSeconds seconds.
+	// Set to false for fire-and-forget alerts, where no follow-up is needed.
+	IssueFollowUpEnabled bool `json:"issueFollowUpEnabled"`
+
+	// AutoResolveSeconds is the number of seconds after which the alert should be automatically resolved, if IssueFollowUpEnabled is true.
+	// The value must be between MinAutoResolveSeconds and MaxAutoResolveSeconds.
+	AutoResolveSeconds int `json:"autoResolveSeconds"`
+
+	// AutoResolveAsInconclusive is a flag that determines if the alert should be automatically resolved as 'inconclusive' instead of 'resolved'.
+	// This affects the which emoji is used in the Slack post.
+	// The default value is false, which means the alert is resolved with status 'resolved'.
+	AutoResolveAsInconclusive bool `json:"autoResolveAsInconclusive"`
+
+	// Severity is the severity of the alert, such as 'panic', 'error', 'warning', 'resolved' or 'info'.
+	// This value determines the emoji used in the Slack post (for the :status: placeholder in header or text).
+	// The value must be one of the predefined AlertSeverity constants.
+	// If unset, the severity is automatically set to 'error'.
+	Severity AlertSeverity `json:"severity"`
+
+	// SlackChannelID is the ID of the Slack channel where the alert should be posted.
+	// Slack channel names are also accepted, and are automatically converted to channel IDs by the API.
+	// The value must be an existing channel ID or name, and the Slack Manager integration must have been added to the channel.
+	// This field is optional, but SlackChannelID and RouteKey cannot both be empty.
+	SlackChannelID string `json:"slackChannelId"`
+	RouteKey       string `json:"routeKey"`
+	Username       string `json:"username"`
+	IconEmoji      string `json:"iconEmoji"`
 
 	// Fields are rendered in a compact format that allows for 2 columns of side-by-side text.
 	Fields                   []*Field               `json:"fields"`
@@ -123,19 +151,27 @@ type Alert struct {
 
 // Field is an alert field.
 type Field struct {
-	// Title is the title of the field. It is automatically truncated at 30 characters.
+	// Title is the title of the field. It is automatically truncated at MaxFieldTitleLength characters.
 	Title string `json:"title"`
 
-	// Value is the value of the field. It is automatically truncated at 200 characters.
+	// Value is the value of the field. It is automatically truncated at MaxFieldValueLength characters.
 	Value string `json:"value"`
 }
 
-// Escalation represents an escalation point for an alert.
+// Escalation represents an escalation point for an issue.
 type Escalation struct {
-	Severity      AlertSeverity `json:"severity"`
-	DelaySeconds  int           `json:"delaySeconds"`
-	SlackMentions []string      `json:"slackMentions"`
-	MoveToChannel string        `json:"moveToChannel"`
+	// Severity is the new severity of the issue, when the escalation is triggered.
+	Severity AlertSeverity `json:"severity"`
+
+	// DelaySeconds is the number of seconds since the issue was created (first alert received),
+	// before the escalation is triggered.
+	DelaySeconds int `json:"delaySeconds"`
+
+	// SlackMentions is a list of Slack mentions that should be added to the Slack post when the escalation is triggered.
+	SlackMentions []string `json:"slackMentions"`
+
+	// MoveToChannel is the ID or name of the Slack channel where the alert should be moved when the escalation is triggered.
+	MoveToChannel string `json:"moveToChannel"`
 }
 
 type Webhook struct {
@@ -228,6 +264,7 @@ func (a *Alert) Clean() {
 	a.Username = strings.TrimSpace(a.Username)
 	a.Author = strings.TrimSpace(a.Author)
 	a.Host = strings.TrimSpace(a.Host)
+	a.Link = strings.TrimSpace(a.Link)
 	a.Footer = strings.TrimSpace(a.Footer)
 	a.IconEmoji = strings.ToLower(strings.TrimSpace(a.IconEmoji))
 	a.Severity = AlertSeverity(strings.ToLower(strings.TrimSpace(string(a.Severity))))
@@ -341,6 +378,10 @@ func (a *Alert) Validate() error {
 		return err
 	}
 
+	if err := a.ValidateLink(); err != nil {
+		return err
+	}
+
 	if err := a.ValidateSeverity(); err != nil {
 		return err
 	}
@@ -403,6 +444,23 @@ func (a *Alert) ValidateIcon() error {
 
 	if !IconRegex.MatchString(a.IconEmoji) {
 		return fmt.Errorf("iconEmoji '%s' is not valid", a.IconEmoji)
+	}
+
+	return nil
+}
+
+func (a *Alert) ValidateLink() error {
+	if a.Link == "" {
+		return nil
+	}
+
+	url, err := url.ParseRequestURI(a.Link)
+	if err != nil {
+		return fmt.Errorf("link is not a valid absolute URL")
+	}
+
+	if url.Scheme == "" {
+		return fmt.Errorf("link is not a valid absolute URL")
 	}
 
 	return nil

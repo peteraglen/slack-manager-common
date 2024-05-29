@@ -475,6 +475,28 @@ func TestAlertValidation(t *testing.T) {
 		assert.ErrorContains(t, a.Validate(), "iconEmoji")
 	})
 
+	t.Run("alert.link should be on the correct format", func(t *testing.T) {
+		// Empty is OK
+		a := &Alert{Header: "a", RouteKey: "b"}
+		a.Clean()
+		assert.NoError(t, a.Validate())
+
+		// Invalid format
+		a = &Alert{Header: "a", RouteKey: "b", Link: "foo"}
+		a.Clean()
+		assert.ErrorContains(t, a.Validate(), "link is not a valid absolute URL")
+
+		// Valid format
+		a = &Alert{Header: "a", RouteKey: "b", Link: "http://foo.bar?foo=bar#sfd"}
+		a.Clean()
+		assert.NoError(t, a.Validate())
+
+		// Relative url is not allowed
+		a = &Alert{Header: "a", RouteKey: "b", Link: "/foo"}
+		a.Clean()
+		assert.ErrorContains(t, a.Validate(), "link is not a valid absolute URL")
+	})
+
 	t.Run("alert.severity should be on the correct format", func(t *testing.T) {
 		a := &Alert{Header: "a", RouteKey: "b", Severity: AlertError}
 		a.Clean()
