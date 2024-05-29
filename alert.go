@@ -15,23 +15,35 @@ import (
 var (
 	// SlackChannelIDOrNameRegex matches valid Slack channel IDs and channel names.
 	// Channel names are mapped to channel IDs by the API.
-	SlackChannelIDOrNameRegex = regexp.MustCompile(`^[0-9a-zA-Z\-_]{1,80}$`)
+	SlackChannelIDOrNameRegex = regexp.MustCompile(fmt.Sprintf(`^[0-9a-zA-Z\-_]{1,%d}$`, MaxSlackChannelIDLength))
 
 	// IconRegex matches valid Slack icon emojis, on the format ':emoji:'.
-	IconRegex = regexp.MustCompile(`^:[^:]{1,50}:$`)
+	IconRegex = regexp.MustCompile(fmt.Sprintf(`^:[^:]{1,%d}:$`, MaxIconEmojiLength))
 
 	// SlackMentionRegex matches valid Slack mentions, such as <!here>, <!channel> and <@U12345678>.
-	SlackMentionRegex = regexp.MustCompile(`^((<!here>)|(<!channel>)|(<@[^>\s]{1,100}>))$`)
+	SlackMentionRegex = regexp.MustCompile(fmt.Sprintf(`^((<!here>)|(<!channel>)|(<@[^>\s]{1,%d}>))$`, MaxMentionLength))
 
 	// MaxTimestampAge is the maximum age of an alert timestamp. If the timestamp is older than this, it will be replaced with the current time.
 	MaxTimestampAge = 7 * 24 * time.Hour
 
-	MaxHeaderLength       = 130
-	MaxFallbackTextLength = 150
-	MaxTextLength         = 10000
-	MaxAuthorLength       = 100
-	MaxHostLength         = 100
-	MaxFooterLength       = 300
+	MaxSlackChannelIDLength       = 80
+	MaxRouteKeyLength             = 1000
+	MaxHeaderLength               = 130
+	MaxFallbackTextLength         = 150
+	MaxTextLength                 = 10000
+	MaxAuthorLength               = 100
+	MaxHostLength                 = 100
+	MaxFooterLength               = 300
+	MaxUsernameLength             = 100
+	MaxFieldTitleLength           = 30
+	MaxFieldValueLength           = 200
+	MaxIconEmojiLength            = 50
+	MaxMentionLength              = 20
+	MaxCorrelationIDLength        = 500
+	MinAutoResolveSeconds         = 30
+	MaxAutoResolveSeconds         = 63113851 // 2 years
+	MaxIgnoreIfTextContainsLength = 1000
+	MaxFieldCount                 = 20
 )
 
 // Alert represents a single alert that can be sent to the Slack Manager.
@@ -51,40 +63,40 @@ type Alert struct {
 	Type string `json:"type"`
 
 	// Header is the main header (title) of the alert.
-	// It is automatically truncated to 130 characters.
+	// It is automatically truncated at 130 characters.
 	// Include :status: in the header (or text) to have it replaced with the appropriate emoji for the alert severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Header string `json:"header"`
 
 	// HeaderWhenResolved is the main header (title) of the alert when in the *resolved* state.
-	// It is automatically truncated to 130 characters.
+	// It is automatically truncated at 130 characters.
 	// This field is optional. If unset, the Header field is used for all alert states.
 	HeaderWhenResolved string `json:"headerWhenResolved"`
 
 	// Text is the main text (body) of the alert.
-	// It is automatically truncated to 10000 characters.
+	// It is automatically truncated at 10000 characters.
 	// Include :status: in the text (or header) to have it replaced with the appropriate emoji for the alert severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Text string `json:"text"`
 
 	// TextWhenResolved is the main text (body) of the alert when in the *resolved* state.
-	// It is automatically truncated to 10000 characters.
+	// It is automatically truncated at 10000 characters.
 	// This field is optional. If unset, the Text field is used for all alert states.
 	TextWhenResolved string `json:"textWhenResolved"`
 
 	// FallbackText is the text displayed in Slack notifications.
 	// It should be a short, human-readable summary of the alert, without markdown or line breaks.
-	// It is automatically truncated to 150 characters.
+	// It is automatically truncated at 150 characters.
 	// This field is optional. If unset, Slack decides what to display in notifications (which may not always be ideal).
 	FallbackText string `json:"fallbackText"`
 
 	// Author is the 'author' of the alert (if relevant), displayed as a context block in the Slack post.
-	// It is automatically truncated to 100 characters.
+	// It is automatically truncated at 100 characters.
 	// This field is optional.
 	Author string `json:"author"`
 
 	// Host is the 'host' on which the alert originated (if any), displayed as a context block in the Slack post.
-	// It is automatically truncated to 100 characters.
+	// It is automatically truncated at 100 characters.
 	// This field is optional.
 	Host                      string        `json:"host"`
 	Footer                    string        `json:"footer"`
@@ -111,10 +123,10 @@ type Alert struct {
 
 // Field is an alert field.
 type Field struct {
-	// Title is the title of the field. It is automatically truncated to 30 characters.
+	// Title is the title of the field. It is automatically truncated at 30 characters.
 	Title string `json:"title"`
 
-	// Value is the value of the field. It is automatically truncated to 200 characters.
+	// Value is the value of the field. It is automatically truncated at 200 characters.
 	Value string `json:"value"`
 }
 
@@ -204,27 +216,29 @@ func (a *Alert) Clean() {
 	}
 
 	a.Type = strings.ToLower(strings.TrimSpace(a.Type))
-	a.SlackChannelID = strings.TrimSpace(a.SlackChannelID)
+	a.SlackChannelID = strings.ToUpper(strings.TrimSpace(a.SlackChannelID))
 	a.RouteKey = strings.ToLower(strings.TrimSpace(a.RouteKey))
 	a.Header = strings.ReplaceAll(strings.TrimSpace(a.Header), "\n", " ")
 	a.HeaderWhenResolved = strings.ReplaceAll(strings.TrimSpace(a.HeaderWhenResolved), "\n", " ")
 	a.Text = strings.TrimSpace(a.Text)
 	a.TextWhenResolved = strings.TrimSpace(a.TextWhenResolved)
-	a.FallbackText = strings.ReplaceAll(strings.TrimSpace(a.FallbackText), ":status:", "")
+	a.FallbackText = strings.TrimSpace(strings.ReplaceAll(a.FallbackText, ":status:", ""))
 	a.FallbackText = strings.ReplaceAll(a.FallbackText, "\n", " ")
 	a.CorrelationID = strings.TrimSpace(a.CorrelationID)
 	a.Username = strings.TrimSpace(a.Username)
 	a.Author = strings.TrimSpace(a.Author)
 	a.Host = strings.TrimSpace(a.Host)
 	a.Footer = strings.TrimSpace(a.Footer)
-	a.IconEmoji = strings.TrimSpace(a.IconEmoji)
+	a.IconEmoji = strings.ToLower(strings.TrimSpace(a.IconEmoji))
 	a.Severity = AlertSeverity(strings.ToLower(strings.TrimSpace(string(a.Severity))))
 
 	if len(a.FallbackText) > MaxFallbackTextLength {
 		a.FallbackText = a.FallbackText[:MaxFallbackTextLength-3] + "..."
 	}
 
-	if a.Severity == "critical" {
+	if a.Severity == "" {
+		a.Severity = AlertError
+	} else if a.Severity == "critical" {
 		a.Severity = AlertError
 	}
 
@@ -257,8 +271,8 @@ func (a *Alert) Clean() {
 		a.Host = strings.TrimSpace(a.Host[:MaxHostLength-3]) + "..."
 	}
 
-	if len(a.Username) > 100 {
-		a.Username = strings.TrimSpace(a.Username[:97]) + "..."
+	if len(a.Username) > MaxUsernameLength {
+		a.Username = strings.TrimSpace(a.Username[:MaxUsernameLength-3]) + "..."
 	}
 
 	if len(a.Footer) > MaxFooterLength {
@@ -266,12 +280,15 @@ func (a *Alert) Clean() {
 	}
 
 	for _, field := range a.Fields {
-		if len(field.Title) > 30 {
-			field.Title = strings.TrimSpace(field.Title[:27]) + "..."
+		field.Title = strings.TrimSpace(field.Title)
+		field.Value = strings.TrimSpace(field.Value)
+
+		if len(field.Title) > MaxFieldTitleLength {
+			field.Title = strings.TrimSpace(field.Title[:MaxFieldTitleLength-3]) + "..."
 		}
 
-		if len(field.Value) > 200 {
-			field.Value = strings.TrimSpace(field.Value[:197]) + "..."
+		if len(field.Value) > MaxFieldValueLength {
+			field.Value = strings.TrimSpace(field.Value[:MaxFieldValueLength-3]) + "..."
 		}
 	}
 
@@ -297,7 +314,7 @@ func (a *Alert) Clean() {
 		})
 
 		for _, e := range a.Escalation {
-			e.MoveToChannel = strings.TrimSpace(e.MoveToChannel)
+			e.MoveToChannel = strings.ToUpper(strings.TrimSpace(e.MoveToChannel))
 
 			for i, mention := range e.SlackMentions {
 				e.SlackMentions[i] = strings.TrimSpace(mention)
@@ -312,7 +329,7 @@ func (a *Alert) Validate() error {
 		return errors.New("alert is nil")
 	}
 
-	if err := a.ValidateSlackChannelID(); err != nil {
+	if err := a.ValidateSlackChannelIDAndRouteKey(); err != nil {
 		return err
 	}
 
@@ -351,10 +368,10 @@ func (a *Alert) Validate() error {
 	return a.ValidateIgnoreIfTextContains()
 }
 
-func (a *Alert) ValidateSlackChannelID() error {
+func (a *Alert) ValidateSlackChannelIDAndRouteKey() error {
 	if a.SlackChannelID != "" {
 		if !SlackChannelIDOrNameRegex.MatchString(a.SlackChannelID) {
-			return fmt.Errorf("slackChannelId '%s' is invalid", a.SlackChannelID)
+			return fmt.Errorf("slackChannelId '%s' is not valid", a.SlackChannelID)
 		}
 
 		return nil
@@ -364,8 +381,8 @@ func (a *Alert) ValidateSlackChannelID() error {
 		return errors.New("slackChannelId and routeKey cannot both be empty")
 	}
 
-	if len(a.RouteKey) > 1000 {
-		return errors.New("routeKey is too long, expected length <=1000")
+	if len(a.RouteKey) > MaxRouteKeyLength {
+		return fmt.Errorf("routeKey is too long, expected length <=%d", MaxRouteKeyLength)
 	}
 
 	return nil
@@ -385,19 +402,15 @@ func (a *Alert) ValidateIcon() error {
 	}
 
 	if !IconRegex.MatchString(a.IconEmoji) {
-		return fmt.Errorf("iconEmoji '%s' is invalid", a.IconEmoji)
+		return fmt.Errorf("iconEmoji '%s' is not valid", a.IconEmoji)
 	}
 
 	return nil
 }
 
 func (a *Alert) ValidateSeverity() error {
-	if a.Severity == "" {
-		return errors.New("severity cannot be empty")
-	}
-
 	if !SeverityIsValid(a.Severity) {
-		return fmt.Errorf("severity '%s' is invalid, expected one of [%s]", a.Severity, strings.Join(ValidSeverities(), ", "))
+		return fmt.Errorf("severity '%s' is not valid, expected one of [%s]", a.Severity, strings.Join(ValidSeverities(), ", "))
 	}
 
 	return nil
@@ -408,8 +421,8 @@ func (a *Alert) ValidateCorrelationID() error {
 		return nil
 	}
 
-	if len(a.CorrelationID) > 500 {
-		return errors.New("correlationId is too long, expected length <=500")
+	if len(a.CorrelationID) > MaxCorrelationIDLength {
+		return fmt.Errorf("correlationId is too long, expected length <=%d", MaxCorrelationIDLength)
 	}
 
 	return nil
@@ -420,13 +433,12 @@ func (a *Alert) ValidateAutoResolve() error {
 		return nil
 	}
 
-	if a.AutoResolveSeconds < 30 {
-		return fmt.Errorf("autoResolveSeconds %d is too low, expected value >=30", a.AutoResolveSeconds)
+	if a.AutoResolveSeconds < MinAutoResolveSeconds {
+		return fmt.Errorf("autoResolveSeconds %d is too low, expected value >=%d", a.AutoResolveSeconds, MinAutoResolveSeconds)
 	}
 
-	// 2 years
-	if a.AutoResolveSeconds > 63113851 {
-		return fmt.Errorf("autoResolveSeconds %d is too high, expected value <=63113851 (2 years)", a.AutoResolveSeconds)
+	if a.AutoResolveSeconds > MaxAutoResolveSeconds {
+		return fmt.Errorf("autoResolveSeconds %d is too high, expected value <=%d", a.AutoResolveSeconds, MaxAutoResolveSeconds)
 	}
 
 	return nil
@@ -438,8 +450,8 @@ func (a *Alert) ValidateIgnoreIfTextContains() error {
 	}
 
 	for index, s := range a.IgnoreIfTextContains {
-		if len(s) > 1000 {
-			return fmt.Errorf("ignoreIfTextContains[%d] is too long, expected length <=1000", index)
+		if len(s) > MaxIgnoreIfTextContainsLength {
+			return fmt.Errorf("ignoreIfTextContains[%d] is too long, expected length <=%d", index, MaxIgnoreIfTextContainsLength)
 		}
 	}
 
@@ -447,8 +459,8 @@ func (a *Alert) ValidateIgnoreIfTextContains() error {
 }
 
 func (a *Alert) ValidateFields() error {
-	if len(a.Fields) > 20 {
-		return errors.New("too many fields, expected <=20")
+	if len(a.Fields) > MaxFieldCount {
+		return fmt.Errorf("too many fields, expected <=%d", MaxFieldCount)
 	}
 
 	return nil
@@ -467,7 +479,7 @@ func (a *Alert) ValidateWebhooks() error {
 
 	for index, hook := range a.Webhooks {
 		if hook.ID == "" {
-			return fmt.Errorf("webhook[%d].id is empty", index)
+			return fmt.Errorf("webhook[%d].id is required", index)
 		}
 
 		if _, ok := webhookIDs[hook.ID]; ok {
@@ -477,20 +489,24 @@ func (a *Alert) ValidateWebhooks() error {
 		webhookIDs[hook.ID] = struct{}{}
 
 		if hook.URL == "" {
-			return fmt.Errorf("webhook[%d].url is empty", index)
+			return fmt.Errorf("webhook[%d].url is required", index)
 		}
 
 		if len(hook.URL) > 1000 {
 			return fmt.Errorf("webhook[%d].url is too long, expected length <=1000", index)
 		}
 
-		_, err := url.ParseRequestURI(hook.URL)
+		url, err := url.ParseRequestURI(hook.URL)
 		if err != nil {
-			return fmt.Errorf("webhook[%d].url '%s' is not a valid absolute URL", index, hook.URL)
+			return fmt.Errorf("webhook[%d].url is not a valid absolute URL", index)
+		}
+
+		if url.Scheme == "" {
+			return fmt.Errorf("webhook[%d].url is not a valid absolute URL", index)
 		}
 
 		if hook.ButtonText == "" {
-			return fmt.Errorf("webhook[%d].buttonText is empty", index)
+			return fmt.Errorf("webhook[%d].buttonText is required", index)
 		}
 
 		if len(hook.ButtonText) > 25 {
@@ -498,7 +514,7 @@ func (a *Alert) ValidateWebhooks() error {
 		}
 
 		if len(hook.ConfirmationText) > 1000 {
-			return fmt.Errorf("webhook[%d].displayText is too long, expected length <=1000", index)
+			return fmt.Errorf("webhook[%d].confirmationText is too long, expected length <=1000", index)
 		}
 
 		if hook.ButtonStyle != "" && !WebhookButtonStyleIsValid(hook.ButtonStyle) {
@@ -529,7 +545,7 @@ func (a *Alert) ValidateWebhooks() error {
 
 		for inputIndex, input := range hook.PlainTextInput {
 			if input.ID == "" {
-				return fmt.Errorf("webhook[%d].plainTextInput[%d].id is empty", index, inputIndex)
+				return fmt.Errorf("webhook[%d].plainTextInput[%d].id is required", index, inputIndex)
 			}
 
 			if _, ok := inputIDs[input.ID]; ok {
@@ -573,7 +589,7 @@ func (a *Alert) ValidateWebhooks() error {
 
 		for inputIndex, input := range hook.CheckboxInput {
 			if input.ID == "" {
-				return fmt.Errorf("webhook[%d].checkboxInput[%d].id is empty", index, inputIndex)
+				return fmt.Errorf("webhook[%d].checkboxInput[%d].id is required", index, inputIndex)
 			}
 
 			if _, ok := inputIDs[input.ID]; ok {
@@ -598,7 +614,7 @@ func (a *Alert) ValidateWebhooks() error {
 
 			for optionIndex, option := range input.Options {
 				if option.Value == "" {
-					return fmt.Errorf("webhook[%d].checkboxInput[%d].options[%d].value is empty", index, inputIndex, optionIndex)
+					return fmt.Errorf("webhook[%d].checkboxInput[%d].options[%d].value is required", index, inputIndex, optionIndex)
 				}
 
 				if _, ok := values[option.Value]; ok {
@@ -636,22 +652,22 @@ func (a *Alert) ValidateEscalation() error {
 		previousDelay = e.DelaySeconds
 
 		if e.Severity != AlertPanic && e.Severity != AlertError && e.Severity != AlertWarning {
-			return fmt.Errorf("escalation[%d].severity '%s' is invalid, expected one of [panic, error, warning]", index, e.Severity)
+			return fmt.Errorf("escalation[%d].severity '%s' is not valid, expected one of [panic, error, warning]", index, e.Severity)
 		}
 
 		if len(e.SlackMentions) > 10 {
-			return fmt.Errorf("escalation[%d].slackMentions have too many mentions, expected <=10", index)
+			return fmt.Errorf("escalation[%d].slackMentions item count is too large, expected <=10", index)
 		}
 
 		for j, mention := range e.SlackMentions {
 			if !SlackMentionRegex.MatchString(mention) {
-				return fmt.Errorf("escalation[%d].slackMentions[%d] '%s' is not valid", index, j, mention)
+				return fmt.Errorf("escalation[%d].slackMentions[%d] is not valid", index, j)
 			}
 		}
 
 		if e.MoveToChannel != "" {
 			if !SlackChannelIDOrNameRegex.MatchString(e.MoveToChannel) {
-				return fmt.Errorf("escalation[%d].moveToChannel '%s' is invalid", index, e.MoveToChannel)
+				return fmt.Errorf("escalation[%d].moveToChannel is not valid", index)
 			}
 		}
 	}
