@@ -49,11 +49,12 @@ const (
 )
 
 // Alert represents a single alert that can be sent to the Slack Manager.
+// Alerts with the same CorrelationID are grouped together in issues by the Slack Manager.
 type Alert struct {
 	// Timestamp is the time when the alert was created. If the timestamp is empty (or older than 7 days), it will be replaced with the current time.
 	Timestamp time.Time `json:"timestamp"`
 
-	// CorrelationID is an optional field used to group related alerts together.
+	// CorrelationID is an optional field used to group related alerts together in issues.
 	// If unset, the correlation ID is constructed by hashing [Header, Text, Author, Host, SlackChannelID].
 	// It is strongly recommended to set this to an explicit value, which makes sense in your context, rather than relying on the default hash value.
 	// With a custom correlation ID, you can update both header and text without creating a new issue.
@@ -66,24 +67,24 @@ type Alert struct {
 
 	// Header is the main header (title) of the alert.
 	// It is automatically truncated at MaxHeaderLength characters.
-	// Include :status: in the header (or text) to have it replaced with the appropriate emoji for the alert severity.
+	// Include :status: in the header (or text) to have it replaced with the appropriate emoji for the issue severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Header string `json:"header"`
 
-	// HeaderWhenResolved is the main header (title) of the alert when in the *resolved* state.
+	// HeaderWhenResolved is the main header (title) of the issue when in the *resolved* state.
 	// It is automatically truncated at MaxHeaderLength characters.
-	// This field is optional. If unset, the Header field is used for all alert states.
+	// This field is optional. If unset, the Header field is used for all issue states.
 	HeaderWhenResolved string `json:"headerWhenResolved"`
 
 	// Text is the main text (body) of the alert.
 	// It is automatically truncated at MaxTextLength characters.
-	// Include :status: in the text (or header) to have it replaced with the appropriate emoji for the alert severity.
+	// Include :status: in the text (or header) to have it replaced with the appropriate emoji for the issue severity.
 	// This field is optional, but Header and Text cannot both be empty.
 	Text string `json:"text"`
 
 	// TextWhenResolved is the main text (body) of the alert when in the *resolved* state.
 	// It is automatically truncated at MaxTextLength characters.
-	// This field is optional. If unset, the Text field is used for all alert states.
+	// This field is optional. If unset, the Text field is used for all issue states.
 	TextWhenResolved string `json:"textWhenResolved"`
 
 	// FallbackText is the text displayed in Slack notifications.
@@ -111,18 +112,18 @@ type Alert struct {
 	// This field is optional, but if set, it must be a valid absolute URL, starting with http:// or https://
 	Link string `json:"link"`
 
-	// IssueFollowUpEnabled is a flag that determines if the alert should be automatically resolved after a certain time.
-	// If set to true, the alert will be resolved after AutoResolveSeconds seconds.
-	// Set to false for fire-and-forget alerts, where no follow-up is needed.
+	// IssueFollowUpEnabled is a flag that determines if the issue should be automatically resolved after a certain time.
+	// If set to true, the issue will be resolved after AutoResolveSeconds seconds.
+	// Set to false for fire-and-forget alerts, where no follow-up is needed (i.e. no issue tracking).
 	IssueFollowUpEnabled bool `json:"issueFollowUpEnabled"`
 
-	// AutoResolveSeconds is the number of seconds after which the alert should be automatically resolved, if IssueFollowUpEnabled is true.
+	// AutoResolveSeconds is the number of seconds after which the issue should be automatically resolved, if IssueFollowUpEnabled is true.
 	// The value must be between MinAutoResolveSeconds and MaxAutoResolveSeconds.
 	AutoResolveSeconds int `json:"autoResolveSeconds"`
 
-	// AutoResolveAsInconclusive is a flag that determines if the alert should be automatically resolved as 'inconclusive' instead of 'resolved'.
+	// AutoResolveAsInconclusive is a flag that determines if the issue should be automatically resolved as 'inconclusive' instead of 'resolved'.
 	// This affects the which emoji is used in the Slack post.
-	// The default value is false, which means the alert is resolved with status 'resolved'.
+	// The default value is false, which means the issue is resolved with status 'resolved'.
 	AutoResolveAsInconclusive bool `json:"autoResolveAsInconclusive"`
 
 	// Severity is the severity of the alert, such as 'panic', 'error', 'warning', 'resolved' or 'info'.
@@ -136,19 +137,36 @@ type Alert struct {
 	// The value must be an existing channel ID or name, and the Slack Manager integration must have been added to the channel.
 	// This field is optional, but SlackChannelID and RouteKey cannot both be empty.
 	SlackChannelID string `json:"slackChannelId"`
-	RouteKey       string `json:"routeKey"`
-	Username       string `json:"username"`
-	IconEmoji      string `json:"iconEmoji"`
+
+	// RouteKey is the case-insensitive route key of the alert, used for routing to the correct Slack channel by the API.
+	// The API will return an error if the route key does not match any configured route.
+	// This field is ignored if SlackChannelID is set.
+	RouteKey string `json:"routeKey"`
+
+	// Username is the username that the alert should be posted as in Slack.
+	// This field is optional. If omitted, the alert is posted as the default bot user.
+	Username string `json:"username"`
+
+	// IconEmoji is the emoji that the alert should be posted with in Slack, on the format ':emoji:'.
+	IconEmoji string `json:"iconEmoji"`
 
 	// Fields are rendered in a compact format that allows for 2 columns of side-by-side text.
-	Fields                   []*Field               `json:"fields"`
-	NotificationDelaySeconds int                    `json:"notificationDelaySeconds"`
-	ArchivingDelaySeconds    int                    `json:"archivingDelaySeconds"`
-	Escalation               []*Escalation          `json:"escalation"`
-	IgnoreIfTextContains     []string               `json:"ignoreIfTextContains"`
-	FailOnRateLimitError     bool                   `json:"failOnRateLimitError"`
-	Webhooks                 []*Webhook             `json:"webhooks"`
-	Metadata                 map[string]interface{} `json:"metadata"`
+	Fields []*Field `json:"fields"`
+
+	// NotificationDelaySeconds is the number of seconds to wait before creating an actual Slack post.
+	// If the issue is resolved before the delay is over, no Slack post is created for the issue.
+	// This is useful for issues that may be resolved quickly, to avoid unnecessary notifications.
+	NotificationDelaySeconds int `json:"notificationDelaySeconds"`
+
+	// ArchivingDelaySeconds is the number of seconds to wait before archiving the issue, after it is resolved.
+	// A non-archived issue is re-opened if a new alert with the same CorrelationID is received, and the same Slack post is updated.
+	// An archived can never be re-opened, and any new alerts with the same CorrelationID will generate a new issue and new Slack post.
+	ArchivingDelaySeconds int                    `json:"archivingDelaySeconds"`
+	Escalation            []*Escalation          `json:"escalation"`
+	IgnoreIfTextContains  []string               `json:"ignoreIfTextContains"`
+	FailOnRateLimitError  bool                   `json:"failOnRateLimitError"`
+	Webhooks              []*Webhook             `json:"webhooks"`
+	Metadata              map[string]interface{} `json:"metadata"`
 }
 
 // Field is an alert field.

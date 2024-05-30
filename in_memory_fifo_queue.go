@@ -8,11 +8,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// InMemoryFifoQueue is an in-memory FIFO queue implementation
+// For TEST purposes only! Do not use in production!
 type InMemoryFifoQueue struct {
 	items        chan *FifoQueueItem
 	writeTimeout time.Duration
 }
 
+// NewInMemoryFifoQueue creates a new InMemoryFifoQueue instance.
+// bufferSize is the maximum number of items that can be stored in the queue.
+// writeTimeout is the maximum time to wait for writing an item to the queue.
+//
+// For TEST purposes only! Do not use in production!
 func NewInMemoryFifoQueue(bufferSize int, writeTimeout time.Duration) *InMemoryFifoQueue {
 	return &InMemoryFifoQueue{
 		items:        make(chan *FifoQueueItem, bufferSize),
@@ -20,6 +27,8 @@ func NewInMemoryFifoQueue(bufferSize int, writeTimeout time.Duration) *InMemoryF
 	}
 }
 
+// Send sends a message to the queue.
+// An error is returned if the context is canceled or the write timeout is reached.
 func (q *InMemoryFifoQueue) Send(ctx context.Context, slackChannelID, _, body string) error {
 	item := &FifoQueueItem{
 		MessageID:         uuid.New().String(),
@@ -43,6 +52,9 @@ func (q *InMemoryFifoQueue) Send(ctx context.Context, slackChannelID, _, body st
 	}
 }
 
+// Receive receives messages from the queue, to the specified sink channel.
+// An error is returned if the context is canceled.
+// The sink channel is closed when the function returns.
 func (q *InMemoryFifoQueue) Receive(ctx context.Context, sinkCh chan<- *FifoQueueItem) error {
 	defer close(sinkCh)
 
