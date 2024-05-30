@@ -14,31 +14,20 @@ const (
 	WebhookAccessLevelChannelMembers WebhookAccessLevel = "channel_members"
 )
 
-var validWebhookAccessLevels map[WebhookAccessLevel]struct{}
-
-func init() {
-	validWebhookAccessLevels = map[WebhookAccessLevel]struct{}{
-		WebhookAccessLevelGlobalAdmins:   {},
-		WebhookAccessLevelChannelAdmins:  {},
-		WebhookAccessLevelChannelMembers: {},
-	}
-}
-
 // WebhookAccessLevelIsValid returns true if the provided WebhookAccessLevel is valid.
 func WebhookAccessLevelIsValid(s WebhookAccessLevel) bool {
-	_, ok := validWebhookAccessLevels[s]
-	return ok
+	switch s {
+	case WebhookAccessLevelGlobalAdmins, WebhookAccessLevelChannelAdmins, WebhookAccessLevelChannelMembers:
+		return true
+	}
+	return false
 }
 
 // ValidWebhookAccessLevels returns a slice of valid WebhookAccessLevel values.
 func ValidWebhookAccessLevels() []string {
-	r := make([]string, len(validWebhookAccessLevels))
-	i := 0
-
-	for s := range validWebhookAccessLevels {
-		r[i] = string(s)
-		i++
+	return []string{
+		string(WebhookAccessLevelGlobalAdmins),
+		string(WebhookAccessLevelChannelAdmins),
+		string(WebhookAccessLevelChannelMembers),
 	}
-
-	return r
 }

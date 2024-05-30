@@ -22,7 +22,9 @@ var (
 
 	// SlackMentionRegex matches valid Slack mentions, such as <!here>, <!channel> and <@U12345678>.
 	SlackMentionRegex = regexp.MustCompile(fmt.Sprintf(`^((<!here>)|(<!channel>)|(<@[^>\s]{1,%d}>))$`, MaxMentionLength))
+)
 
+const (
 	// MaxTimestampAge is the maximum age of an alert timestamp. If the timestamp is older than this, it will be replaced with the current time.
 	MaxTimestampAge = 7 * 24 * time.Hour
 
@@ -452,11 +454,11 @@ func (a *Alert) ValidateLink() error {
 
 	url, err := url.ParseRequestURI(a.Link)
 	if err != nil {
-		return fmt.Errorf("link is not a valid absolute URL")
+		return errors.New("link is not a valid absolute URL")
 	}
 
 	if url.Scheme == "" {
-		return fmt.Errorf("link is not a valid absolute URL")
+		return errors.New("link is not a valid absolute URL")
 	}
 
 	return nil
@@ -526,7 +528,7 @@ func (a *Alert) ValidateWebhooks() error {
 	}
 
 	if len(a.Webhooks) > 5 {
-		return fmt.Errorf("too many webhooks, expected <=5")
+		return errors.New("too many webhooks, expected <=5")
 	}
 
 	webhookIDs := make(map[string]struct{})

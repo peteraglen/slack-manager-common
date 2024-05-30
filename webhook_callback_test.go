@@ -1,21 +1,24 @@
-package common
+package common_test
 
 import (
 	"testing"
 
+	common "github.com/peteraglen/slack-manager-common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookGetPayloadValue(t *testing.T) {
-	var w *WebhookCallback
+	t.Parallel()
+
+	var w *common.WebhookCallback
 	val := w.GetPayloadValue("key")
 	assert.Empty(t, val)
 
-	w = &WebhookCallback{}
+	w = &common.WebhookCallback{}
 	val = w.GetPayloadValue("key")
 	assert.Empty(t, val)
 
-	w = &WebhookCallback{
+	w = &common.WebhookCallback{
 		Payload: map[string]interface{}{
 			"key": "value",
 		},
@@ -28,15 +31,17 @@ func TestWebhookGetPayloadValue(t *testing.T) {
 }
 
 func TestWebhookGetPayloadString(t *testing.T) {
-	var w *WebhookCallback
+	t.Parallel()
+
+	var w *common.WebhookCallback
 	val := w.GetPayloadString("key")
 	assert.Equal(t, "", val)
 
-	w = &WebhookCallback{}
+	w = &common.WebhookCallback{}
 	val = w.GetPayloadString("key")
 	assert.Equal(t, "", val)
 
-	w = &WebhookCallback{
+	w = &common.WebhookCallback{
 		Payload: map[string]interface{}{
 			"key": "value",
 		},
@@ -49,15 +54,17 @@ func TestWebhookGetPayloadString(t *testing.T) {
 }
 
 func TestWebhookGetPayloadInt(t *testing.T) {
-	var w *WebhookCallback
+	t.Parallel()
+
+	var w *common.WebhookCallback
 	val := w.GetPayloadInt("key", 42)
 	assert.Equal(t, 42, val)
 
-	w = &WebhookCallback{}
+	w = &common.WebhookCallback{}
 	val = w.GetPayloadInt("key", 42)
 	assert.Equal(t, 42, val)
 
-	w = &WebhookCallback{
+	w = &common.WebhookCallback{
 		Payload: map[string]interface{}{
 			"key": 123,
 		},
@@ -70,15 +77,17 @@ func TestWebhookGetPayloadInt(t *testing.T) {
 }
 
 func TestWebhookGetPayloadBool(t *testing.T) {
-	var w *WebhookCallback
+	t.Parallel()
+
+	var w *common.WebhookCallback
 	val := w.GetPayloadBool("key", true)
 	assert.True(t, val)
 
-	w = &WebhookCallback{}
+	w = &common.WebhookCallback{}
 	val = w.GetPayloadBool("key", true)
 	assert.True(t, val)
 
-	w = &WebhookCallback{
+	w = &common.WebhookCallback{
 		Payload: map[string]interface{}{
 			"key": true,
 		},
@@ -91,15 +100,17 @@ func TestWebhookGetPayloadBool(t *testing.T) {
 }
 
 func TestWebhookGetInputValue(t *testing.T) {
-	var w *WebhookCallback
+	t.Parallel()
+
+	var w *common.WebhookCallback
 	val := w.GetInputValue("key")
 	assert.Empty(t, val)
 
-	w = &WebhookCallback{}
+	w = &common.WebhookCallback{}
 	val = w.GetInputValue("key")
 	assert.Empty(t, val)
 
-	w = &WebhookCallback{
+	w = &common.WebhookCallback{
 		Input: map[string]string{
 			"key": "value",
 		},
@@ -112,15 +123,17 @@ func TestWebhookGetInputValue(t *testing.T) {
 }
 
 func TestGetCheckboxInputSelectedValues(t *testing.T) {
-	var w *WebhookCallback
+	t.Parallel()
+
+	var w *common.WebhookCallback
 	val := w.GetCheckboxInputSelectedValues("key")
 	assert.Empty(t, val)
 
-	w = &WebhookCallback{}
+	w = &common.WebhookCallback{}
 	val = w.GetCheckboxInputSelectedValues("key")
 	assert.Empty(t, val)
 
-	w = &WebhookCallback{
+	w = &common.WebhookCallback{
 		CheckboxInput: map[string][]string{
 			"key": {"value1", "value2"},
 		},

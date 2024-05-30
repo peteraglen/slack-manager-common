@@ -1,20 +1,25 @@
-package common
+package common_test
 
 import (
 	"testing"
 
+	common "github.com/peteraglen/slack-manager-common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookDisplayMode(t *testing.T) {
-	assert.True(t, WebhookDisplayModeIsValid(WebhookDisplayModeAlways))
-	assert.True(t, WebhookDisplayModeIsValid(WebhookDisplayModeOpenIssue))
-	assert.True(t, WebhookDisplayModeIsValid(WebhookDisplayModeResolvedIssue))
-	assert.False(t, WebhookDisplayModeIsValid("invalid"))
+	t.Parallel()
+
+	assert.True(t, common.WebhookDisplayModeIsValid(common.WebhookDisplayModeAlways))
+	assert.True(t, common.WebhookDisplayModeIsValid(common.WebhookDisplayModeOpenIssue))
+	assert.True(t, common.WebhookDisplayModeIsValid(common.WebhookDisplayModeResolvedIssue))
+	assert.False(t, common.WebhookDisplayModeIsValid("invalid"))
 }
 
 func TestWebhookDisplayModeString(t *testing.T) {
-	s := ValidWebhookDisplayModes()
+	t.Parallel()
+
+	s := common.ValidWebhookDisplayModes()
 	assert.Len(t, s, 3)
 	assert.Contains(t, s, "always")
 	assert.Contains(t, s, "open_issue")

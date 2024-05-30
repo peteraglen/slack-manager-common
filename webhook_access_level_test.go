@@ -1,20 +1,25 @@
-package common
+package common_test
 
 import (
 	"testing"
 
+	common "github.com/peteraglen/slack-manager-common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookAccessLevelValidation(t *testing.T) {
-	assert.True(t, WebhookAccessLevelIsValid(WebhookAccessLevelGlobalAdmins))
-	assert.True(t, WebhookAccessLevelIsValid(WebhookAccessLevelChannelAdmins))
-	assert.True(t, WebhookAccessLevelIsValid(WebhookAccessLevelChannelMembers))
-	assert.False(t, WebhookAccessLevelIsValid("invalid"))
+	t.Parallel()
+
+	assert.True(t, common.WebhookAccessLevelIsValid(common.WebhookAccessLevelGlobalAdmins))
+	assert.True(t, common.WebhookAccessLevelIsValid(common.WebhookAccessLevelChannelAdmins))
+	assert.True(t, common.WebhookAccessLevelIsValid(common.WebhookAccessLevelChannelMembers))
+	assert.False(t, common.WebhookAccessLevelIsValid("invalid"))
 }
 
 func TestWebhookAccessLevelString(t *testing.T) {
-	s := ValidWebhookAccessLevels()
+	t.Parallel()
+
+	s := common.ValidWebhookAccessLevels()
 	assert.Len(t, s, 3)
 	assert.Contains(t, s, "global_admins")
 	assert.Contains(t, s, "channel_admins")

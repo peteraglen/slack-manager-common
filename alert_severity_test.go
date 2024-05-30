@@ -1,31 +1,38 @@
-package common
+package common_test
 
 import (
 	"testing"
 
+	common "github.com/peteraglen/slack-manager-common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAlertSeverityValidation(t *testing.T) {
-	assert.True(t, SeverityIsValid(AlertPanic))
-	assert.True(t, SeverityIsValid(AlertError))
-	assert.True(t, SeverityIsValid(AlertWarning))
-	assert.True(t, SeverityIsValid(AlertResolved))
-	assert.True(t, SeverityIsValid(AlertInfo))
-	assert.False(t, SeverityIsValid("invalid"))
+	t.Parallel()
+
+	assert.True(t, common.SeverityIsValid(common.AlertPanic))
+	assert.True(t, common.SeverityIsValid(common.AlertError))
+	assert.True(t, common.SeverityIsValid(common.AlertWarning))
+	assert.True(t, common.SeverityIsValid(common.AlertResolved))
+	assert.True(t, common.SeverityIsValid(common.AlertInfo))
+	assert.False(t, common.SeverityIsValid("invalid"))
 }
 
 func TestAlertPriority(t *testing.T) {
-	assert.Equal(t, 3, SeverityPriority(AlertPanic))
-	assert.Equal(t, 2, SeverityPriority(AlertError))
-	assert.Equal(t, 1, SeverityPriority(AlertWarning))
-	assert.Equal(t, 0, SeverityPriority(AlertResolved))
-	assert.Equal(t, 0, SeverityPriority(AlertInfo))
-	assert.Equal(t, -1, SeverityPriority("invalid"))
+	t.Parallel()
+
+	assert.Equal(t, 3, common.SeverityPriority(common.AlertPanic))
+	assert.Equal(t, 2, common.SeverityPriority(common.AlertError))
+	assert.Equal(t, 1, common.SeverityPriority(common.AlertWarning))
+	assert.Equal(t, 0, common.SeverityPriority(common.AlertResolved))
+	assert.Equal(t, 0, common.SeverityPriority(common.AlertInfo))
+	assert.Equal(t, -1, common.SeverityPriority("invalid"))
 }
 
 func TestValidSeverities(t *testing.T) {
-	s := ValidSeverities()
+	t.Parallel()
+
+	s := common.ValidSeverities()
 	assert.Len(t, s, 5)
 	assert.Contains(t, s, "panic")
 	assert.Contains(t, s, "error")

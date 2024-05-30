@@ -11,30 +11,19 @@ const (
 	WebhookButtonStyleDanger WebhookButtonStyle = "danger"
 )
 
-var validWebhookButtonStyles map[WebhookButtonStyle]struct{}
-
-func init() {
-	validWebhookButtonStyles = map[WebhookButtonStyle]struct{}{
-		WebhookButtonStylePrimary: {},
-		WebhookButtonStyleDanger:  {},
-	}
-}
-
 // WebhookButtonStyleIsValid returns true if the provided WebhookButtonStyle is valid.
 func WebhookButtonStyleIsValid(s WebhookButtonStyle) bool {
-	_, ok := validWebhookButtonStyles[s]
-	return ok
+	switch s {
+	case WebhookButtonStylePrimary, WebhookButtonStyleDanger:
+		return true
+	}
+	return false
 }
 
 // ValidWebhookButtonStyles returns a slice of valid WebhookButtonStyle values.
 func ValidWebhookButtonStyles() []string {
-	r := make([]string, len(validWebhookButtonStyles))
-	i := 0
-
-	for s := range validWebhookButtonStyles {
-		r[i] = string(s)
-		i++
+	return []string{
+		string(WebhookButtonStylePrimary),
+		string(WebhookButtonStyleDanger),
 	}
-
-	return r
 }

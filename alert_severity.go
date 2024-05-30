@@ -25,52 +25,35 @@ const (
 	AlertInfo AlertSeverity = "info"
 )
 
-var (
-	alertPriority   map[AlertSeverity]int
-	validSeverities map[AlertSeverity]struct{}
-)
-
-func init() {
-	validSeverities = make(map[AlertSeverity]struct{})
-	alertPriority = make(map[AlertSeverity]int)
-
-	validSeverities[AlertPanic] = struct{}{}
-	alertPriority[AlertPanic] = 3
-
-	validSeverities[AlertError] = struct{}{}
-	alertPriority[AlertError] = 2
-
-	validSeverities[AlertWarning] = struct{}{}
-	alertPriority[AlertWarning] = 1
-
-	validSeverities[AlertResolved] = struct{}{}
-	alertPriority[AlertResolved] = 0
-
-	validSeverities[AlertInfo] = struct{}{}
-	alertPriority[AlertInfo] = 0
-}
-
 func SeverityIsValid(s AlertSeverity) bool {
-	_, ok := validSeverities[s]
-	return ok
+	switch s {
+	case AlertPanic, AlertError, AlertWarning, AlertResolved, AlertInfo:
+		return true
+	}
+	return false
 }
 
 func SeverityPriority(s AlertSeverity) int {
-	val, ok := alertPriority[s]
-	if ok {
-		return val
+	switch s {
+	case AlertPanic:
+		return 3
+	case AlertError:
+		return 2
+	case AlertWarning:
+		return 1
+	case AlertResolved, AlertInfo:
+		return 0
+	default:
+		return -1
 	}
-	return -1
 }
 
 func ValidSeverities() []string {
-	r := make([]string, len(validSeverities))
-	i := 0
-
-	for s := range validSeverities {
-		r[i] = string(s)
-		i++
+	return []string{
+		string(AlertPanic),
+		string(AlertError),
+		string(AlertWarning),
+		string(AlertResolved),
+		string(AlertInfo),
 	}
-
-	return r
 }

@@ -1,19 +1,24 @@
-package common
+package common_test
 
 import (
 	"testing"
 
+	common "github.com/peteraglen/slack-manager-common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWebhookButtonStyle(t *testing.T) {
-	assert.True(t, WebhookButtonStyleIsValid(WebhookButtonStylePrimary))
-	assert.True(t, WebhookButtonStyleIsValid(WebhookButtonStyleDanger))
-	assert.False(t, WebhookButtonStyleIsValid("invalid"))
+	t.Parallel()
+
+	assert.True(t, common.WebhookButtonStyleIsValid(common.WebhookButtonStylePrimary))
+	assert.True(t, common.WebhookButtonStyleIsValid(common.WebhookButtonStyleDanger))
+	assert.False(t, common.WebhookButtonStyleIsValid("invalid"))
 }
 
 func TestWebhookButtonStyleString(t *testing.T) {
-	s := ValidWebhookButtonStyles()
+	t.Parallel()
+
+	s := common.ValidWebhookButtonStyles()
 	assert.Len(t, s, 2)
 	assert.Contains(t, s, "primary")
 	assert.Contains(t, s, "danger")

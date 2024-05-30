@@ -2,7 +2,7 @@ package common
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,7 +20,7 @@ func NewInMemoryFifoQueue(bufferSize int, writeTimeout time.Duration) *InMemoryF
 	}
 }
 
-func (q *InMemoryFifoQueue) Send(ctx context.Context, slackChannelID, dedupID, body string) error {
+func (q *InMemoryFifoQueue) Send(ctx context.Context, slackChannelID, _, body string) error {
 	item := &FifoQueueItem{
 		MessageID:         uuid.New().String(),
 		SlackChannelID:    slackChannelID,
@@ -37,7 +37,7 @@ func (q *InMemoryFifoQueue) Send(ctx context.Context, slackChannelID, dedupID, b
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(q.writeTimeout):
-		return fmt.Errorf("timeout while writing to queue")
+		return errors.New("timeout while writing to queue")
 	case q.items <- item:
 		return nil
 	}

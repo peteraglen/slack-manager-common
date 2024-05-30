@@ -32,7 +32,9 @@ func (w *WebhookCallback) GetPayloadString(key string) string {
 	}
 
 	if s, ok := w.Payload[key]; ok {
-		return s.(string)
+		if val, ok := s.(string); ok {
+			return val
+		}
 	}
 
 	return ""
@@ -44,7 +46,9 @@ func (w *WebhookCallback) GetPayloadInt(key string, defaultValue int) int {
 	}
 
 	if s, ok := w.Payload[key]; ok {
-		return s.(int)
+		if val, ok := s.(int); ok {
+			return val
+		}
 	}
 
 	return defaultValue
@@ -56,7 +60,9 @@ func (w *WebhookCallback) GetPayloadBool(key string, defaultValue bool) bool {
 	}
 
 	if b, ok := w.Payload[key]; ok {
-		return b.(bool)
+		if val, ok := b.(bool); ok {
+			return val
+		}
 	}
 
 	return defaultValue

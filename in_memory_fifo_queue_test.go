@@ -1,55 +1,64 @@
-package common
+package common_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
+	common "github.com/peteraglen/slack-manager-common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInMemoryFifoQueue(t *testing.T) {
+	t.Parallel()
+
 	t.Run("full queue should produce timeout error", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
-		queue := NewInMemoryFifoQueue(2, time.Millisecond)
+		queue := common.NewInMemoryFifoQueue(2, time.Millisecond)
 		err := queue.Send(ctx, "C000000001", "dedupID_1", "body_1")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = queue.Send(ctx, "C000000002", "dedupID_2", "body_2")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = queue.Send(ctx, "C000000003", "dedupID_3", "body_3")
-		assert.ErrorContains(t, err, "timeout")
+		require.ErrorContains(t, err, "timeout")
 	})
 
 	t.Run("cancelled context should return context error", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
-		queue := NewInMemoryFifoQueue(1, time.Second)
+		queue := common.NewInMemoryFifoQueue(1, time.Second)
 		err := queue.Send(ctx, "C000000001", "dedupID_1", "body_1")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		cancel()
 		err = queue.Send(ctx, "C000000002", "dedupID_2", "body_2")
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("receive function should return all items in order", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		queue := NewInMemoryFifoQueue(3, time.Millisecond)
+		queue := common.NewInMemoryFifoQueue(3, time.Millisecond)
 		err := queue.Send(ctx, "C000000001", "dedupID_1", "body_1")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = queue.Send(ctx, "C000000002", "dedupID_2", "body_2")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = queue.Send(ctx, "C000000003", "dedupID_3", "body_3")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		receivedItems := make(chan *FifoQueueItem, 3)
+		receivedItems := make(chan *common.FifoQueueItem, 3)
 
 		go func() {
 			err := queue.Receive(ctx, receivedItems)
 			assert.ErrorIs(t, err, context.Canceled)
 		}()
 
-		result := []*FifoQueueItem{}
+		result := []*common.FifoQueueItem{}
 
 		for item := range receivedItems {
 			result = append(result, item)
@@ -63,20 +72,22 @@ func TestInMemoryFifoQueue(t *testing.T) {
 		assert.Equal(t, "body_2", result[1].Body)
 		assert.Equal(t, "body_3", result[2].Body)
 
-		assert.NoError(t, result[0].Ack(context.Background()))
+		require.NoError(t, result[0].Ack(context.Background()))
 		assert.Nil(t, result[0].ExtendVisibility)
 	})
 
 	t.Run("receive function should react to context cancelled when waiting to write to sinkCh", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		queue := NewInMemoryFifoQueue(2, time.Second)
+		queue := common.NewInMemoryFifoQueue(2, time.Second)
 		err := queue.Send(ctx, "C000000001", "dedupID_1", "body_1")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = queue.Send(ctx, "C000000002", "dedupID_2", "body_2")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		receivedItems := make(chan *FifoQueueItem)
+		receivedItems := make(chan *common.FifoQueueItem)
 
 		go func() {
 			err := queue.Receive(ctx, receivedItems)
