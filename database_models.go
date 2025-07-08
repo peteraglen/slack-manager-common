@@ -13,7 +13,7 @@ type Issue interface {
 	// The correlation ID is used to group related alerts together, and may or may not be client defined.
 	// It is not guaranteed to be unique across all issues, and *cannot* be used as a unique issue identifier.
 	// It is not URL safe, and should thus be encoded before being used in URLs or as part of a database key.
-	GetCorrelationID()
+	GetCorrelationID() string
 
 	// IsOpen returns true if this issue is currently open (i.e. not archived).
 	// A resolved issue is still considered open until it is archived.
