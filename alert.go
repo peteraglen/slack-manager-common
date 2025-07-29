@@ -265,7 +265,7 @@ func NewAlert(severity AlertSeverity) *Alert {
 // UniqueID returns a unique and deterministic ID for this alert, for database/storage purposes.
 // The ID is based on certain fields of the alert, and is base64 encoded to ensure it is safe for use in URLs and as a database key.
 func (a *Alert) UniqueID() string {
-	return hash("alert", a.SlackChannelID, a.RouteKey, a.CorrelationID, a.Timestamp.Format(time.RFC3339Nano), a.Header, a.Text)
+	return hash("alert", a.SlackChannelID, a.RouteKey, a.CorrelationID, a.Timestamp.UTC().Format(time.RFC3339Nano), a.Header, a.Text)
 }
 
 func (a *Alert) Clean() {

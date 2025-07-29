@@ -5,6 +5,9 @@ import "encoding/json"
 type Issue interface {
 	json.Marshaler
 
+	// ChannelID returns the Slack channel ID that this issue belongs to.
+	ChannelID() string
+
 	// UniqueID returns a unique and deterministic ID for this issue, for database/storage purposes.
 	// The ID is based on certain issue fields, and is base64 encoded to ensure it is safe for use in URLs and as a database key.
 	UniqueID() string
@@ -27,6 +30,9 @@ type Issue interface {
 
 type MoveMapping interface {
 	json.Marshaler
+
+	// ChannelID returns the Slack channel ID that this move mapping belongs to (i.e. the channel where the move was initiated).
+	ChannelID() string
 
 	// UniqueID returns a unique and deterministic ID for this move mapping, for database/storage purposes.
 	// The ID is based on the original channel and the correlation ID, and is base64 encoded to ensure it is safe for use in URLs and as a database key.
