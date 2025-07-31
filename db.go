@@ -8,6 +8,10 @@ import (
 // DB is an interface for interacting with the database.
 // It must be implemented by any database driver used by the Slack Manager.
 type DB interface {
+	// Init initializes the database, for example by creating necessary tables or collections.
+	// Set skipSchemaValidation to true to skip schema validation.
+	Init(ctx context.Context, skipSchemaValidation bool) error
+
 	// SaveAlert saves an alert to the database (for auditing purposes).
 	// The same alert may be saved multiple times, in case of errors and retries.
 	//
@@ -63,4 +67,9 @@ type DB interface {
 	//
 	// The database implementation should return an error if the query matches multiple states, and [nil, nil] if no state is found.
 	FindChannelProcessingState(ctx context.Context, channelID string) (*ChannelProcessingState, error)
+
+	// DropAllData drops *all* data from the database.
+	// This is useful for testing purposes, to reset the database state.
+	// It should be used with caution, as it will remove all alerts, issues, move mappings, and processing states.
+	DropAllData(ctx context.Context) error
 }
