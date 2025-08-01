@@ -39,6 +39,9 @@ func TestSaveIssue(t *testing.T, client common.DB) {
 	channel := "C0ABABABAB"
 	require := require.New(t)
 
+	err := client.SaveIssue(ctx, nil)
+	require.Error(err, "should fail to save nil issue")
+
 	corr1 := ksuid.New().String()
 	alert1 := newTestAlert(channel, corr1)
 	issue1 := newTestIssue(alert1, ksuid.New().String())
@@ -47,7 +50,7 @@ func TestSaveIssue(t *testing.T, client common.DB) {
 	alert2 := newTestAlert(channel, corr2)
 	issue2 := newTestIssue(alert2, ksuid.New().String())
 
-	err := client.SaveIssue(ctx, issue1)
+	err = client.SaveIssue(ctx, issue1)
 	require.NoError(err)
 	id, issueBody, err := client.FindOpenIssueByCorrelationID(ctx, channel, corr1)
 	require.NoError(err, "failed to get issue after saving")
@@ -79,8 +82,19 @@ func TestSaveIssue(t *testing.T, client common.DB) {
 	assert.Equal(t, issue1.ID, foundIssue.ID, "issue ID should match after saving")
 	assert.Equal(t, issue1.SlackPostID, foundIssue.SlackPostID, "SlackPostID should match after saving")
 
-	err = client.SaveIssue(ctx, nil)
-	require.Error(err, "should fail to save nil issue")
+	// Simulate a change in channel ID (.e. moving the issue)
+	// The database should allow updating the channel ID
+	newChannel := "C0ABABABAC"
+	issue2.LastAlert.SlackChannelID = newChannel
+	err = client.SaveIssue(ctx, issue2)
+	require.NoError(err, "should not error when saving issue with updated channel ID")
+	id, issueBody, err = client.FindOpenIssueByCorrelationID(ctx, newChannel, corr2)
+	require.NoError(err, "failed to get issue after saving with updated channel ID")
+	assert.Equal(t, issue2.ID, id, "issue ID should match after saving with updated channel ID")
+	require.NotNil(issueBody, "issue body should not be nil after saving with updated channel ID")
+	foundIssue = testIssueFromJSON(issueBody)
+	assert.Equal(t, issue2.ID, foundIssue.ID, "issue ID should match after saving with updated channel ID")
+	assert.Equal(t, newChannel, foundIssue.LastAlert.SlackChannelID, "channel ID should match after saving with updated channel ID")
 }
 
 func TestFindOpenIssueByCorrelationID(t *testing.T, client common.DB) {
