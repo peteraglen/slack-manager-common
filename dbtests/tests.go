@@ -34,21 +34,24 @@ func TestSaveAlert(t *testing.T, client common.DB) {
 	require.Error(t, err, "should fail to save nil alert")
 }
 
-func TestSaveAndFindIssue(t *testing.T, client common.DB) {
+func TestSaveIssue(t *testing.T, client common.DB) {
 	ctx := context.Background()
 	channel := "C0ABABABAB"
 	require := require.New(t)
 
-	alert1 := newTestAlert(channel, ksuid.New().String())
+	corr1 := ksuid.New().String()
+	alert1 := newTestAlert(channel, corr1)
 	issue1 := newTestIssue(alert1, ksuid.New().String())
 
-	alert2 := newTestAlert(channel, ksuid.New().String())
+	corr2 := ksuid.New().String()
+	alert2 := newTestAlert(channel, corr2)
 	issue2 := newTestIssue(alert2, ksuid.New().String())
 
 	err := client.SaveIssue(ctx, issue1)
 	require.NoError(err)
-	issueBody, err := client.GetIssue(ctx, issue1.ID)
+	id, issueBody, err := client.FindOpenIssueByCorrelationID(ctx, channel, corr1)
 	require.NoError(err, "failed to get issue after saving")
+	assert.Equal(t, issue1.ID, id, "issue ID should match after saving")
 	require.NotNil(issueBody, "issue body should not be nil after saving")
 	foundIssue := testIssueFromJSON(issueBody)
 	assert.Equal(t, issue1.ID, foundIssue.ID, "issue ID should match after saving")
@@ -56,13 +59,21 @@ func TestSaveAndFindIssue(t *testing.T, client common.DB) {
 
 	err = client.SaveIssue(ctx, issue2)
 	require.NoError(err)
+	id, issueBody, err = client.FindOpenIssueByCorrelationID(ctx, channel, corr2)
+	require.NoError(err, "failed to get issue after saving")
+	assert.Equal(t, issue2.ID, id, "issue ID should match after saving")
+	require.NotNil(issueBody, "issue body should not be nil after saving")
+	foundIssue = testIssueFromJSON(issueBody)
+	assert.Equal(t, issue2.ID, foundIssue.ID, "issue ID should match after saving")
+	assert.Equal(t, issue2.SlackPostID, foundIssue.SlackPostID, "SlackPostID should match after saving")
 
 	// Saving the same issue again should update the existing issue
 	issue1.SlackPostID = ksuid.New().String() // Simulate a change in SlackPostID
 	err = client.SaveIssue(ctx, issue1)
 	require.NoError(err)
-	issueBody, err = client.GetIssue(ctx, issue1.ID)
+	id, issueBody, err = client.FindOpenIssueByCorrelationID(ctx, channel, corr1)
 	require.NoError(err, "failed to get issue after saving")
+	assert.Equal(t, issue1.ID, id, "issue ID should match after saving")
 	require.NotNil(issueBody, "issue body should not be nil after saving")
 	foundIssue = testIssueFromJSON(issueBody)
 	assert.Equal(t, issue1.ID, foundIssue.ID, "issue ID should match after saving")
@@ -70,10 +81,6 @@ func TestSaveAndFindIssue(t *testing.T, client common.DB) {
 
 	err = client.SaveIssue(ctx, nil)
 	require.Error(err, "should fail to save nil issue")
-
-	// Try to get a non-existent issue
-	_, err = client.GetIssue(ctx, "non-existent-id")
-	require.Error(err, "should fail to get non-existent issue")
 }
 
 func TestFindOpenIssueByCorrelationID(t *testing.T, client common.DB) {

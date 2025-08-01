@@ -24,9 +24,6 @@ type DB interface {
 	// SaveIssues creates or updates multiple issues in the database.
 	SaveIssues(ctx context.Context, issues ...Issue) error
 
-	// GetIssue retrieves a single issue from the database, based on the provided issue ID.
-	GetIssue(ctx context.Context, issueID string) (json.RawMessage, error)
-
 	// FindOpenIssueByCorrelationID finds a single open issue in the database, based on the provided channel ID and correlation ID.
 	//
 	// The database implementation should return an error if the query matches multiple issues, and [nil, nil] if no issue is found.
