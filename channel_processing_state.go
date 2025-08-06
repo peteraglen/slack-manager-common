@@ -9,15 +9,17 @@ import (
 // This is used to prevent multiple instances of the Slack Manager from processing the same channel at the same time,
 // and to ensure that processing is done at regular intervals.
 type ChannelProcessingState struct {
-	ChannelID     string    `json:"channelId"`
-	Created       time.Time `json:"created"`
-	LastProcessed time.Time `json:"lastProcessed"`
+	ChannelID           string    `json:"channelId"`
+	Created             time.Time `json:"created"`
+	LastChannelActivity time.Time `json:"lastChannelActivity"`
+	LastProcessed       time.Time `json:"lastProcessed"`
 }
 
 func NewChannelProcessingState(channelID string) *ChannelProcessingState {
 	return &ChannelProcessingState{
-		ChannelID:     channelID,
-		Created:       time.Now().UTC(),
-		LastProcessed: time.Time{}.UTC(),
+		ChannelID:           channelID,
+		Created:             time.Now().UTC(),
+		LastChannelActivity: time.Now().UTC(),
+		LastProcessed:       time.Time{}.UTC(),
 	}
 }
