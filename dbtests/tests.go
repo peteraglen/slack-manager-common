@@ -356,7 +356,7 @@ func TestCreatingAndFindingMoveMappings(t *testing.T, client common.DB) {
 	assert.Equal(moveMapping.OriginalChannelID, foundMoveMapping.OriginalChannelID, "original channel ID should match")
 	assert.Equal(moveMapping.TargetChannelID, foundMoveMapping.TargetChannelID, "target channel ID should match")
 	assert.Equal(moveMapping.CorrelationID, foundMoveMapping.CorrelationID, "correlation ID should match")
-	assert.Equal(moveMapping.Timestamp.Format(time.RFC3339Nano), foundMoveMapping.Timestamp.Format(time.RFC3339Nano), "timestamp should match")
+	assert.Equal(moveMapping.Timestamp.UTC().Format(time.RFC3339Nano), foundMoveMapping.Timestamp.UTC().Format(time.RFC3339Nano), "timestamp should match")
 
 	moveMapping.TargetChannelID = "C0ABABABAD" // Simulate a change in target channel ID
 	err = client.SaveMoveMapping(ctx, moveMapping)
@@ -371,7 +371,7 @@ func TestCreatingAndFindingMoveMappings(t *testing.T, client common.DB) {
 	assert.Equal(moveMapping.OriginalChannelID, foundMoveMapping.OriginalChannelID, "original channel ID should still match after update")
 	assert.Equal(moveMapping.TargetChannelID, foundMoveMapping.TargetChannelID, "target channel ID should match after update")
 	assert.Equal(moveMapping.CorrelationID, foundMoveMapping.CorrelationID, "correlation ID should still match after update")
-	assert.Equal(moveMapping.Timestamp.Format(time.RFC3339Nano), foundMoveMapping.Timestamp.Format(time.RFC3339Nano), "timestamp should still match after update")
+	assert.Equal(moveMapping.Timestamp.UTC().Format(time.RFC3339Nano), foundMoveMapping.Timestamp.UTC().Format(time.RFC3339Nano), "timestamp should still match after update")
 
 	err = client.SaveMoveMapping(ctx, nil)
 	require.Error(err, "should fail to create move mapping with nil move mapping")
@@ -410,8 +410,8 @@ func TestCreatingAndFindingChannelProcessingState(t *testing.T, client common.DB
 	require.NoError(err, "should not error when finding channel processing state")
 	assert.NotNil(foundState, "should find channel processing state after saving")
 	assert.Equal(state.ChannelID, foundState.ChannelID, "channel ID should match")
-	assert.Equal(state.Created.Format(time.RFC3339Nano), foundState.Created.Format(time.RFC3339Nano), "created timestamp should match")
-	assert.Equal(state.LastProcessed.Format(time.RFC3339Nano), foundState.LastProcessed.Format(time.RFC3339Nano), "last processed timestamp should match")
+	assert.Equal(state.Created.UTC().Format(time.RFC3339Nano), foundState.Created.UTC().Format(time.RFC3339Nano), "created timestamp should match")
+	assert.Equal(state.LastProcessed.UTC().Format(time.RFC3339Nano), foundState.LastProcessed.UTC().Format(time.RFC3339Nano), "last processed timestamp should match")
 
 	// Update the channel processing state
 	state.LastProcessed = now.Add(5 * time.Minute)
@@ -422,8 +422,8 @@ func TestCreatingAndFindingChannelProcessingState(t *testing.T, client common.DB
 	require.NoError(err, "should not error when finding updated channel processing state")
 	assert.NotNil(foundState, "should find updated channel processing state after saving")
 	assert.Equal(state.ChannelID, foundState.ChannelID, "channel ID should still match after update")
-	assert.Equal(state.Created.Format(time.RFC3339Nano), foundState.Created.Format(time.RFC3339Nano), "created timestamp should still match after update")
-	assert.Equal(state.LastProcessed.Format(time.RFC3339Nano), foundState.LastProcessed.Format(time.RFC3339Nano), "last processed timestamp should match after update")
+	assert.Equal(state.Created.UTC().Format(time.RFC3339Nano), foundState.Created.UTC().Format(time.RFC3339Nano), "created timestamp should still match after update")
+	assert.Equal(state.LastProcessed.UTC().Format(time.RFC3339Nano), foundState.LastProcessed.UTC().Format(time.RFC3339Nano), "last processed timestamp should match after update")
 }
 
 type testIssue struct {
