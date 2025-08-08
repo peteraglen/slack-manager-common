@@ -13,6 +13,7 @@ type ChannelProcessingState struct {
 	Created             time.Time `json:"created"`
 	LastChannelActivity time.Time `json:"lastChannelActivity"`
 	LastProcessed       time.Time `json:"lastProcessed"`
+	OpenIssues          int       `json:"openIssues"`
 }
 
 func NewChannelProcessingState(channelID string) *ChannelProcessingState {
