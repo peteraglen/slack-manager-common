@@ -3,6 +3,7 @@ package common_test
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
@@ -241,12 +242,12 @@ func TestAlertClean(t *testing.T) {
 	t.Run("fallbackText should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(151, randGen)
+		s := randString(common.MaxFallbackTextLength+1, randGen)
 		a := common.Alert{
 			FallbackText: s,
 		}
 		a.Clean()
-		assert.Equal(t, s[:147]+"...", a.FallbackText)
+		assert.Equal(t, s[:common.MaxFallbackTextLength-3]+"...", a.FallbackText)
 	})
 
 	t.Run("empty severity should default to error", func(t *testing.T) {
@@ -292,88 +293,88 @@ func TestAlertClean(t *testing.T) {
 	t.Run("header should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(131, randGen)
-		s2 := randString(131, randGen)
+		s := randString(common.MaxHeaderLength+1, randGen)
+		s2 := randString(common.MaxHeaderLength+1, randGen)
 		a := common.Alert{
 			Header:             s,
 			HeaderWhenResolved: s2,
 		}
 		a.Clean()
-		assert.Equal(t, s[:127]+"...", a.Header)
-		assert.Equal(t, s2[:127]+"...", a.HeaderWhenResolved)
+		assert.Equal(t, s[:common.MaxHeaderLength-3]+"...", a.Header)
+		assert.Equal(t, s2[:common.MaxHeaderLength-3]+"...", a.HeaderWhenResolved)
 	})
 
 	t.Run("text should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(10001, randGen)
-		s2 := randString(10001, randGen) + "```" // Ends with code block
+		s := randString(common.MaxTextLength+1, randGen)
+		s2 := randString(common.MaxTextLength+1, randGen) + "```" // Ends with code block
 		a := common.Alert{
 			Text:             s,
 			TextWhenResolved: s2,
 		}
 		a.Clean()
-		assert.Equal(t, s[:9997]+"...", a.Text)
-		assert.Equal(t, s2[:9994]+"...```", a.TextWhenResolved)
+		assert.Equal(t, s[:common.MaxTextLength-3]+"...", a.Text)
+		assert.Equal(t, s2[:common.MaxTextLength-6]+"...```", a.TextWhenResolved)
 	})
 
 	t.Run("author should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(101, randGen)
+		s := randString(common.MaxAuthorLength+1, randGen)
 		a := common.Alert{
 			Author: s,
 		}
 		a.Clean()
-		assert.Equal(t, s[:97]+"...", a.Author)
+		assert.Equal(t, s[:common.MaxAuthorLength-3]+"...", a.Author)
 	})
 
 	t.Run("username should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(101, randGen)
+		s := randString(common.MaxUsernameLength+1, randGen)
 		a := common.Alert{
 			Username: s,
 		}
 		a.Clean()
-		assert.Equal(t, s[:97]+"...", a.Username)
+		assert.Equal(t, s[:common.MaxUsernameLength-3]+"...", a.Username)
 	})
 
 	t.Run("host should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(101, randGen)
+		s := randString(common.MaxHostLength+1, randGen)
 		a := common.Alert{
 			Host: s,
 		}
 		a.Clean()
-		assert.Equal(t, s[:97]+"...", a.Host)
+		assert.Equal(t, s[:common.MaxHostLength-3]+"...", a.Host)
 	})
 
 	t.Run("footer should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		s := randString(301, randGen)
+		s := randString(common.MaxFooterLength+1, randGen)
 		a := common.Alert{
 			Footer: s,
 		}
 		a.Clean()
-		assert.Equal(t, s[:297]+"...", a.Footer)
+		assert.Equal(t, s[:common.MaxFooterLength-3]+"...", a.Footer)
 	})
 
 	t.Run("field titles and values should be truncated when too long", func(t *testing.T) {
 		t.Parallel()
 
-		title := randString(31, randGen)
-		value := randString(201, randGen)
+		title := randString(common.MaxFieldTitleLength+1, randGen)
+		value := randString(common.MaxFieldValueLength+1, randGen)
 		a := common.Alert{
 			Fields: []*common.Field{
 				{Title: title, Value: value},
 			},
 		}
 		a.Clean()
-		assert.Equal(t, title[:27]+"...", a.Fields[0].Title)
-		assert.Equal(t, value[:197]+"...", a.Fields[0].Value)
+		assert.Equal(t, title[:common.MaxFieldTitleLength-3]+"...", a.Fields[0].Title)
+		assert.Equal(t, value[:common.MaxFieldValueLength-3]+"...", a.Fields[0].Value)
 	})
 
 	t.Run("webhook fields be trimmed", func(t *testing.T) {
@@ -696,9 +697,9 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.NoError(t, a.Validate())
 
-		// Max webhooks is 5
+		// Max webhooks is MaxWebhookCount
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{}}
-		for i := 1; i <= 6; i++ {
+		for i := 1; i <= common.MaxWebhookCount+1; i++ {
 			a.Webhooks = append(a.Webhooks, &common.Webhook{ID: "foo", URL: "http://foo.bar", ButtonText: "press me"})
 		}
 		a.Clean()
@@ -722,8 +723,8 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].url is required")
 
-		// Url max length is 1000
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar/" + randString(986, randGen), ButtonText: "press me"}}}
+		// Url max length is MaxWebhookURLLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar/" + randString(common.MaxWebhookURLLength-14, randGen), ButtonText: "press me"}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].url is too long")
 
@@ -742,13 +743,13 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].buttonText is required")
 
-		// Button text max length is 25
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: randString(26, randGen)}}}
+		// Button text max length is MaxWebhookButtonTextLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: randString(common.MaxWebhookButtonTextLength+1, randGen)}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].buttonText is too long")
 
-		// Confirmation text max length is 1000
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", ConfirmationText: randString(1001, randGen)}}}
+		// Confirmation text max length is MaxWebhookConfirmationTextLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", ConfirmationText: randString(common.MaxWebhookConfirmationTextLength+1, randGen)}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].confirmationText is too long")
 
@@ -767,25 +768,25 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].displayMode 'foo' is not valid")
 
-		// Max payload size is 50
+		// Max payload size is MaxWebhookPayloadCount
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", Payload: map[string]any{}}}}
-		for i := 1; i <= 51; i++ {
+		for i := 1; i <= common.MaxWebhookPayloadCount+1; i++ {
 			a.Webhooks[0].Payload[randString(10, randGen)] = randString(10, randGen)
 		}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].payload item count is too large")
 
-		// Max plain text input size is 10
+		// Max plain text input size is MaxWebhookPlainTextInputCount
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me"}}}
-		for i := 1; i <= 11; i++ {
+		for i := 1; i <= common.MaxWebhookPlainTextInputCount+1; i++ {
 			a.Webhooks[0].PlainTextInput = append(a.Webhooks[0].PlainTextInput, &common.WebhookPlainTextInput{ID: randString(5, randGen), Description: randString(5, randGen)})
 		}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput item count is too large")
 
-		// Max checkbox size is 10
+		// Max checkbox size is MaxWebhookCheckboxInputCount
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me"}}}
-		for i := 1; i <= 11; i++ {
+		for i := 1; i <= common.MaxWebhookCheckboxInputCount+1; i++ {
 			a.Webhooks[0].CheckboxInput = append(a.Webhooks[0].CheckboxInput, &common.WebhookCheckboxInput{ID: randString(5, randGen), Label: randString(5, randGen)})
 		}
 		a.Clean()
@@ -801,13 +802,13 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[1].id must be unique")
 
-		// Input ID max length is 200
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: randString(201, randGen), Description: "foo"}}}}}
+		// Input ID max length is MaxWebhookInputIDLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: randString(common.MaxWebhookInputIDLength+1, randGen), Description: "foo"}}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[0].id is too long")
 
-		// Input description max length is 200
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: randString(201, randGen)}}}}}
+		// Input description max length is MaxWebhookInputDescriptionLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: randString(common.MaxWebhookInputDescriptionLength+1, randGen)}}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[0].description is too long")
 
@@ -816,20 +817,20 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[0].minLength must be >=0")
 
-		// Input minstLength cannt be larger than 3000
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: "foo", MinLength: 3001}}}}}
+		// Input minLength cannot be larger than MaxWebhookInputTextLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: "foo", MinLength: common.MaxWebhookInputTextLength + 1}}}}}
 		a.Clean()
-		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[0].minLength must be <=3000")
+		require.ErrorContains(t, a.Validate(), fmt.Sprintf("webhook[0].plainTextInput[0].minLength must be <=%d", common.MaxWebhookInputTextLength))
 
 		// Input maxLength cannot be negative
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: "foo", MaxLength: -1}}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[0].maxLength must be >=0")
 
-		// Input maxLength cannot be larger than 3000
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: "foo", MaxLength: 3001}}}}}
+		// Input maxLength cannot be larger than MaxWebhookInputTextLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: "foo", MaxLength: common.MaxWebhookInputTextLength + 1}}}}}
 		a.Clean()
-		require.ErrorContains(t, a.Validate(), "webhook[0].plainTextInput[0].maxLength must be <=3000")
+		require.ErrorContains(t, a.Validate(), fmt.Sprintf("webhook[0].plainTextInput[0].maxLength must be <=%d", common.MaxWebhookInputTextLength))
 
 		// Input minLength cannot be larger than maxLength
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", PlainTextInput: []*common.WebhookPlainTextInput{{ID: "foo", Description: "foo", MinLength: 10, MaxLength: 5}}}}}
@@ -851,19 +852,19 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].checkboxInput[1].id must be unique")
 
-		// Checkbox ID max length is 200
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: randString(201, randGen), Label: "foo"}}}}}
+		// Checkbox ID max length is MaxWebhookInputIDLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: randString(common.MaxWebhookInputIDLength+1, randGen), Label: "foo"}}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].checkboxInput[0].id is too long")
 
-		// Checkbox label max length is 200
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: "foo", Label: randString(201, randGen)}}}}}
+		// Checkbox label max length is MaxWebhookInputLabelLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: "foo", Label: randString(common.MaxWebhookInputLabelLength+1, randGen)}}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].checkboxInput[0].label is too long")
 
-		// Checkbox options length cannot be larger than 5
+		// Checkbox options length cannot be larger than MaxWebhookCheckboxOptionCount
 		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: "foo", Label: "foo"}}}}}
-		for i := 1; i <= 6; i++ {
+		for i := 1; i <= common.MaxWebhookCheckboxOptionCount+1; i++ {
 			a.Webhooks[0].CheckboxInput[0].Options = append(a.Webhooks[0].CheckboxInput[0].Options, &common.WebhookCheckboxOption{Value: "foo"})
 		}
 		a.Clean()
@@ -879,8 +880,8 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].checkboxInput[0].options[1].value must be unique")
 
-		// Checkbox option text max length is 50
-		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: "foo", Label: "foo", Options: []*common.WebhookCheckboxOption{{Value: "foo", Text: randString(51, randGen)}}}}}}}
+		// Checkbox option text max length is MaxWebhookCheckboxOptionTextLength
+		a = &common.Alert{Header: "a", RouteKey: "b", Webhooks: []*common.Webhook{{ID: "foo", URL: "http://foo.bar", ButtonText: "press me", CheckboxInput: []*common.WebhookCheckboxInput{{ID: "foo", Label: "foo", Options: []*common.WebhookCheckboxOption{{Value: "foo", Text: randString(common.MaxWebhookCheckboxOptionTextLength+1, randGen)}}}}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "webhook[0].checkboxInput[0].options[0].text is too long")
 	})
@@ -893,48 +894,48 @@ func TestAlertValidation(t *testing.T) {
 		a.Clean()
 		require.NoError(t, a.Validate())
 
-		// Escalation delay must be at least 30 seconds
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 29, Severity: common.AlertError}}}
+		// Escalation delay must be at least MinEscalationDelaySeconds
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds - 1, Severity: common.AlertError}}}
 		a.Clean()
-		require.ErrorContains(t, a.Validate(), "escalation[0].delaySeconds '29' is too low")
+		require.ErrorContains(t, a.Validate(), fmt.Sprintf("escalation[0].delaySeconds '%d' is too low", common.MinEscalationDelaySeconds-1))
 
-		// Escalation delay must be at least 30 seconds larger than the previous escalation
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertError}, {DelaySeconds: 59, Severity: common.AlertPanic}}}
+		// Escalation delay must be at least MinEscalationDelayDiffSeconds larger than the previous escalation
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertError}, {DelaySeconds: common.MinEscalationDelaySeconds + common.MinEscalationDelayDiffSeconds - 1, Severity: common.AlertPanic}}}
 		a.Clean()
-		require.ErrorContains(t, a.Validate(), "escalation[1].delaySeconds '59' is too small compared to previous escalation")
+		require.ErrorContains(t, a.Validate(), fmt.Sprintf("escalation[1].delaySeconds '%d' is too small compared to previous escalation", common.MinEscalationDelaySeconds+common.MinEscalationDelayDiffSeconds-1))
 
 		// Escalation severity must be valid
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: "foo"}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: "foo"}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].severity 'foo' is not valid")
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertInfo}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertInfo}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].severity 'info' is not valid")
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertResolved}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertResolved}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].severity 'resolved' is not valid")
 
-		// Escalation mentions count must be at most 10
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertError, SlackMentions: []string{}}}}
-		for i := 1; i <= 11; i++ {
+		// Escalation mentions count must be at most MaxEscalationSlackMentionCount
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertError, SlackMentions: []string{}}}}
+		for i := 1; i <= common.MaxEscalationSlackMentionCount+1; i++ {
 			a.Escalation[0].SlackMentions = append(a.Escalation[0].SlackMentions, "<@foo>")
 		}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].slackMentions item count is too large")
 
 		// Escalation mentions must be valid
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertError, SlackMentions: []string{"foo"}}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertError, SlackMentions: []string{"foo"}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].slackMentions[0] is not valid")
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertError, SlackMentions: []string{"<@" + randString(common.MaxMentionLength+1, randGen) + ">"}}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertError, SlackMentions: []string{"<@" + randString(common.MaxMentionLength+1, randGen) + ">"}}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].slackMentions[0] is not valid")
 
 		// Escalation moveToChannel must be a valid channel ID or channel name
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertError, MoveToChannel: "foo bar"}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertError, MoveToChannel: "foo bar"}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].moveToChannel is not valid")
-		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: 30, Severity: common.AlertError, MoveToChannel: randString(81, randGen)}}}
+		a = &common.Alert{Header: "a", RouteKey: "b", Escalation: []*common.Escalation{{DelaySeconds: common.MinEscalationDelaySeconds, Severity: common.AlertError, MoveToChannel: randString(common.MaxSlackChannelIDLength+1, randGen)}}}
 		a.Clean()
 		require.ErrorContains(t, a.Validate(), "escalation[0].moveToChannel is not valid")
 	})
@@ -1051,6 +1052,26 @@ func TestAlertCleanNilElements(t *testing.T) {
 		}
 		assert.NotPanics(t, func() { a.Clean() })
 		assert.Equal(t, "input1", a.Webhooks[0].PlainTextInput[1].ID)
+	})
+
+	t.Run("nil checkboxInput element should not panic", func(t *testing.T) {
+		t.Parallel()
+
+		a := common.Alert{
+			Webhooks: []*common.Webhook{
+				{
+					ID:         "test",
+					URL:        "http://test.com",
+					ButtonText: "click",
+					CheckboxInput: []*common.WebhookCheckboxInput{
+						nil,
+						{ID: "cb1", Label: "My Label"},
+					},
+				},
+			},
+		}
+		assert.NotPanics(t, func() { a.Clean() })
+		assert.Equal(t, "cb1", a.Webhooks[0].CheckboxInput[1].ID)
 	})
 
 	t.Run("nil escalation element should not panic", func(t *testing.T) {

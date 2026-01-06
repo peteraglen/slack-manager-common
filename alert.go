@@ -49,7 +49,6 @@ const (
 	MaxIgnoreIfTextContainsCount  = 20
 	MaxFieldCount                 = 20
 
-	// Webhook constants
 	MaxWebhookCount                    = 5
 	MaxWebhookIDLength                 = 100
 	MaxWebhookURLLength                = 1000
@@ -66,7 +65,6 @@ const (
 	MaxWebhookCheckboxOptionTextLength = 50
 	MaxCheckboxOptionValueLength       = 100
 
-	// Escalation constants
 	MaxEscalationCount             = 3
 	MinEscalationDelaySeconds      = 30
 	MinEscalationDelayDiffSeconds  = 30
