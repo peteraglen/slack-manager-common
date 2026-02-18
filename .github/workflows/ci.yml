@@ -16,10 +16,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.2
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6.2.0
       with:
         go-version: ${{ matrix.go-version }}
 
@@ -42,7 +42,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: matrix.go-version == '1.25'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5.5.2
       with:
         file: ./coverage.out
         fail_ci_if_error: false
@@ -53,17 +53,17 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.2
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6.2.0
       with:
         go-version: '1.25'
 
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v4
+      uses: golangci/golangci-lint-action@v9.2.0
       with:
-        version: latest
+        version: v2.9.0
         args: --timeout=5m
 
   security:
@@ -72,20 +72,20 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.2
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6.2.0
       with:
         go-version: '1.25'
 
     - name: Run Gosec Security Scanner
       run: |
-        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        go install github.com/securego/gosec/v2/cmd/gosec@v2.21.4
         gosec -fmt=json -out=gosec-results.json -no-fail ./...
 
     - name: Upload Gosec results
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4.32.3
       with:
         sarif_file: gosec-results.json
       continue-on-error: true
