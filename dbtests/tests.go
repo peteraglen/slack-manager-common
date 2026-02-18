@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +15,31 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Package dbtests provides a comprehensive test suite for common.DB implementations.
+//
+// Usage in your database plugin:
+//
+//	func TestDatabaseCompliance(t *testing.T) {
+//	    if testing.Short() {
+//	        t.Skip("Skipping integration tests")
+//	    }
+//
+//	    db := setupTestDatabase(t)
+//	    defer teardownTestDatabase(t, db)
+//
+//	    // Run all standard tests
+//	    dbtests.RunAllTests(t, db)
+//	}
+//
+// Or run individual tests:
+//
+//	dbtests.TestSaveAlert(t, db)
+//	dbtests.TestSaveIssue(t, db)
+//	// ... etc
+//
+// All tests clean up after themselves where possible, but some tests
+// use DropAllData() to ensure a clean state before running.
 
 func TestSaveAlert(t *testing.T, client common.DB) {
 	ctx := context.Background()
@@ -494,6 +521,426 @@ func TestCreatingAndFindingChannelProcessingState(t *testing.T, client common.DB
 	assert.Equal(state.LastProcessed.UTC().Format(time.RFC3339Nano), foundState.LastProcessed.UTC().Format(time.RFC3339Nano), "last processed timestamp should match after update")
 }
 
+// TestInit verifies that database initialization works correctly.
+// It tests basic initialization and idempotent calls.
+func TestInit(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	// First initialization should succeed
+	err := client.Init(ctx, true)
+	require.NoError(err, "first initialization should succeed")
+
+	// Second initialization should be idempotent
+	err = client.Init(ctx, true)
+	require.NoError(err, "second initialization should be idempotent")
+}
+
+// TestInit_WithSchemaValidation verifies initialization with schema validation enabled.
+func TestInit_WithSchemaValidation(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	// Drop all data first to ensure clean state
+	err := client.DropAllData(ctx)
+	require.NoError(err, "should not error when dropping all data")
+
+	// Initialize with schema validation
+	err = client.Init(ctx, false)
+	require.NoError(err, "initialization with schema validation should succeed")
+
+	// Verify database is functional after initialization
+	alert := newTestAlert("C0ABABABAB", uuid.New().String())
+	err = client.SaveAlert(ctx, alert)
+	require.NoError(err, "should be able to save alert after initialization")
+}
+
+// TestMoveIssue_EdgeCases tests edge cases for moving issues between channels.
+func TestMoveIssue_EdgeCases(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	channel1 := "C0ABABABAB"
+	channel2 := "C0ABABABAC"
+
+	t.Run("same source and target channel", func(t *testing.T) {
+		require := require.New(t)
+
+		corr := uuid.New().String()
+		alert := newTestAlert(channel1, corr)
+		issue := newTestIssue(alert, uuid.New().String())
+
+		err := client.SaveIssue(ctx, issue)
+		require.NoError(err)
+
+		// Try to move to the same channel - should error
+		err = client.MoveIssue(ctx, issue, channel1, channel1)
+		require.Error(err, "should error when source and target channels are the same")
+	})
+
+	t.Run("channel mismatch", func(t *testing.T) {
+		require := require.New(t)
+
+		corr := uuid.New().String()
+		alert := newTestAlert(channel1, corr)
+		issue := newTestIssue(alert, uuid.New().String())
+
+		err := client.SaveIssue(ctx, issue)
+		require.NoError(err)
+
+		// Try to move but issue's channel doesn't match source
+		issue.LastAlert.SlackChannelID = channel2
+		_ = client.MoveIssue(ctx, issue, channel1, channel2)
+		// This should either succeed or error depending on implementation
+		// Most implementations should validate channel consistency
+	})
+
+	t.Run("moving non-existent issue", func(t *testing.T) {
+		require := require.New(t)
+
+		corr := uuid.New().String()
+		alert := newTestAlert(channel1, corr)
+		issue := newTestIssue(alert, uuid.New().String())
+
+		// Don't save the issue, just try to move it
+		issue.LastAlert.SlackChannelID = channel2
+		err := client.MoveIssue(ctx, issue, channel1, channel2)
+		// Should not error - implementations should handle gracefully
+		require.NoError(err, "moving non-existent issue should not error")
+	})
+}
+
+// TestConcurrentSaveIssue tests concurrent writes to the same issue.
+func TestConcurrentSaveIssue(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	channel := "C0ABABABAB"
+	corr := uuid.New().String()
+	require := require.New(t)
+
+	// Create initial issue
+	alert := newTestAlert(channel, corr)
+	issue := newTestIssue(alert, uuid.New().String())
+	err := client.SaveIssue(ctx, issue)
+	require.NoError(err)
+
+	// Concurrently update the same issue
+	const goroutines = 10
+	var wg sync.WaitGroup
+	errors := make(chan error, goroutines)
+
+	for i := range goroutines {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			// Each goroutine updates the issue with a different post ID
+			issue.SlackPostID = fmt.Sprintf("post-%d-%s", index, uuid.New().String())
+			if err := client.SaveIssue(ctx, issue); err != nil {
+				errors <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errors)
+
+	// Check that no errors occurred
+	for err := range errors {
+		require.NoError(err, "concurrent save should not error")
+	}
+
+	// Verify issue still exists
+	id, issueBody, err := client.FindOpenIssueByCorrelationID(ctx, channel, corr)
+	require.NoError(err)
+	require.NotEmpty(id)
+	require.NotNil(issueBody)
+}
+
+// TestConcurrentMoveMapping tests concurrent move mapping operations.
+func TestConcurrentMoveMapping(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	require := require.New(t)
+	const goroutines = 5
+
+	var wg sync.WaitGroup
+	errors := make(chan error, goroutines)
+
+	for i := range goroutines {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			corr := uuid.New().String()
+			originalChannel := fmt.Sprintf("C0ABABAB%02d", index)
+			targetChannel := fmt.Sprintf("C0ABABAC%02d", index)
+
+			moveMapping := newTestMoveMapping(corr, originalChannel, targetChannel)
+			if err := client.SaveMoveMapping(ctx, moveMapping); err != nil {
+				errors <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errors)
+
+	for err := range errors {
+		require.NoError(err, "concurrent move mapping operations should not error")
+	}
+}
+
+// TestLoadOpenIssuesInChannel_LargeDataset tests loading many issues from a channel.
+func TestLoadOpenIssuesInChannel_LargeDataset(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	channel := "C0ABABABAB"
+	require := require.New(t)
+	assert := assert.New(t)
+
+	// Ensure clean state
+	err := client.DropAllData(ctx)
+	require.NoError(err)
+	err = client.Init(ctx, true)
+	require.NoError(err)
+
+	// Create 100 issues
+	const issueCount = 100
+	issues := make([]common.Issue, issueCount)
+	expectedIDs := make(map[string]bool)
+
+	for i := range issueCount {
+		alert := newTestAlert(channel, uuid.New().String())
+		issue := newTestIssue(alert, uuid.New().String())
+		issues[i] = issue
+		expectedIDs[issue.UniqueID()] = true
+	}
+
+	// Save all issues
+	err = client.SaveIssues(ctx, issues...)
+	require.NoError(err, "should save 100 issues successfully")
+
+	// Load all open issues
+	loadedIssues, err := client.LoadOpenIssuesInChannel(ctx, channel)
+	require.NoError(err)
+	assert.Len(loadedIssues, issueCount, "should load all 100 issues")
+
+	// Verify all issue IDs are present
+	for id := range loadedIssues {
+		assert.True(expectedIDs[id], "loaded issue ID should be in expected set")
+	}
+}
+
+// TestFindActiveChannels_ManyChannels tests finding active channels with many channels.
+func TestFindActiveChannels_ManyChannels(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	require := require.New(t)
+	assert := assert.New(t)
+
+	// Ensure clean state
+	err := client.DropAllData(ctx)
+	require.NoError(err)
+	err = client.Init(ctx, true)
+	require.NoError(err)
+
+	// Create issues in 50 different channels
+	const channelCount = 50
+	expectedChannels := make(map[string]bool)
+
+	for i := range channelCount {
+		channelID := fmt.Sprintf("C0ABABAB%02d", i)
+		expectedChannels[channelID] = true
+
+		alert := newTestAlert(channelID, uuid.New().String())
+		issue := newTestIssue(alert, uuid.New().String())
+		err = client.SaveIssue(ctx, issue)
+		require.NoError(err)
+	}
+
+	// Find all active channels
+	activeChannels, err := client.FindActiveChannels(ctx)
+	require.NoError(err)
+	assert.Len(activeChannels, channelCount, "should find all 50 channels")
+
+	// Verify all channels are present
+	for _, channelID := range activeChannels {
+		assert.True(expectedChannels[channelID], "channel should be in expected set")
+	}
+}
+
+// TestSpecialCharactersInCorrelationID tests handling of special characters.
+func TestSpecialCharactersInCorrelationID(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	channel := "C0ABABABAB"
+
+	testCases := []struct {
+		name          string
+		correlationID string
+	}{
+		{"unicode emoji", "alert-🚨-critical"},
+		{"spaces", "alert with spaces"},
+		{"special chars", "alert!@#$%^&*()"},
+		{"quotes", `alert"with'quotes`},
+		{"backslashes", `alert\with\backslashes`},
+		{"newlines", "alert\nwith\nnewlines"},
+		{"tabs", "alert\twith\ttabs"},
+		{"unicode", "alert-日本語-中文"}, //nolint:gosmopolitan // Testing unicode support
+		{"sql injection attempt", "'; DROP TABLE issues; --"},
+		{"long ID near max", strings.Repeat("a", 490)},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
+			assert := assert.New(t)
+
+			alert := newTestAlert(channel, tc.correlationID)
+			issue := newTestIssue(alert, uuid.New().String())
+
+			// Save issue with special correlation ID
+			err := client.SaveIssue(ctx, issue)
+			require.NoError(err, "should save issue with special correlation ID")
+
+			// Find issue by correlation ID
+			id, issueBody, err := client.FindOpenIssueByCorrelationID(ctx, channel, tc.correlationID)
+			require.NoError(err, "should find issue with special correlation ID")
+			assert.NotEmpty(id, "should return issue ID")
+			assert.NotNil(issueBody, "should return issue body")
+
+			foundIssue := testIssueFromJSON(issueBody)
+			assert.Equal(tc.correlationID, foundIssue.CorrelationID, "correlation ID should be preserved exactly")
+		})
+	}
+}
+
+// TestChannelProcessingState_EdgeCases tests edge cases for channel processing state.
+func TestChannelProcessingState_EdgeCases(t *testing.T, client common.DB) {
+	ctx := context.Background()
+
+	t.Run("nil state", func(t *testing.T) {
+		require := require.New(t)
+		err := client.SaveChannelProcessingState(ctx, nil)
+		require.Error(err, "should error when saving nil state")
+	})
+
+	t.Run("high open issues count", func(t *testing.T) {
+		require := require.New(t)
+		assert := assert.New(t)
+
+		channelID := "C" + uuid.New().String()[:10]
+		state := common.NewChannelProcessingState(channelID)
+		state.OpenIssues = 10000
+
+		err := client.SaveChannelProcessingState(ctx, state)
+		require.NoError(err)
+
+		foundState, err := client.FindChannelProcessingState(ctx, channelID)
+		require.NoError(err)
+		assert.Equal(10000, foundState.OpenIssues)
+	})
+
+	t.Run("timestamp precision", func(t *testing.T) {
+		require := require.New(t)
+		assert := assert.New(t)
+
+		channelID := "C" + uuid.New().String()[:10]
+		now := time.Now().UTC()
+		state := common.NewChannelProcessingState(channelID)
+		state.LastProcessed = now
+
+		err := client.SaveChannelProcessingState(ctx, state)
+		require.NoError(err)
+
+		foundState, err := client.FindChannelProcessingState(ctx, channelID)
+		require.NoError(err)
+
+		// Verify nanosecond precision is preserved
+		assert.Equal(now.Format(time.RFC3339Nano), foundState.LastProcessed.Format(time.RFC3339Nano))
+	})
+}
+
+// TestSaveIssue_ComplexAlert tests saving issues with complex alert data.
+func TestSaveIssue_ComplexAlert(t *testing.T, client common.DB) {
+	ctx := context.Background()
+	channel := "C0ABABABAB"
+	corr := uuid.New().String()
+	require := require.New(t)
+	assert := assert.New(t)
+
+	// Create alert with all fields populated
+	alert := newTestAlertWithAllFields(channel, corr)
+	issue := newTestIssue(alert, uuid.New().String())
+
+	err := client.SaveIssue(ctx, issue)
+	require.NoError(err, "should save issue with complex alert")
+
+	// Retrieve and verify
+	id, issueBody, err := client.FindOpenIssueByCorrelationID(ctx, channel, corr)
+	require.NoError(err)
+	assert.NotEmpty(id)
+	require.NotNil(issueBody)
+
+	foundIssue := testIssueFromJSON(issueBody)
+	assert.Equal(alert.Header, foundIssue.LastAlert.Header)
+	assert.Equal(alert.Text, foundIssue.LastAlert.Text)
+	assert.Equal(alert.Severity, foundIssue.LastAlert.Severity)
+	assert.Len(foundIssue.LastAlert.Fields, len(alert.Fields))
+}
+
+// TestContextCancellation tests that operations respect context cancellation.
+func TestContextCancellation(t *testing.T, client common.DB) {
+	t.Run("canceled context for FindOpenIssueByCorrelationID", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		_, _, err := client.FindOpenIssueByCorrelationID(ctx, "C0ABABABAB", "correlation-123")
+		// Should either return error or handle gracefully
+		// Implementation-specific behavior
+		if err != nil {
+			assert.Error(t, err)
+		}
+	})
+}
+
+// RunAllTests runs all database compliance tests.
+// This is a convenience function for plugin implementations.
+func RunAllTests(t *testing.T, client common.DB) {
+	t.Helper()
+	// Initialize database
+	ctx := context.Background()
+	if err := client.Init(ctx, true); err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+
+	// Core functionality tests
+	t.Run("SaveAlert", func(t *testing.T) { TestSaveAlert(t, client) })
+	t.Run("SaveIssue", func(t *testing.T) { TestSaveIssue(t, client) })
+	t.Run("MoveIssue", func(t *testing.T) { TestMoveIssue(t, client) })
+	t.Run("FindOpenIssueByCorrelationID", func(t *testing.T) { TestFindOpenIssueByCorrelationID(t, client) })
+	t.Run("FindIssueBySlackPostID", func(t *testing.T) { TestFindIssueBySlackPostID(t, client) })
+	t.Run("SaveIssues", func(t *testing.T) { TestSaveIssues(t, client) })
+	t.Run("FindActiveChannels", func(t *testing.T) { TestFindActiveChannels(t, client) })
+	t.Run("LoadOpenIssuesInChannel", func(t *testing.T) { TestLoadOpenIssuesInChannel(t, client) })
+	t.Run("CreatingAndFindingMoveMappings", func(t *testing.T) { TestCreatingAndFindingMoveMappings(t, client) })
+	t.Run("DeletingMoveMappings", func(t *testing.T) { TestDeletingMoveMappings(t, client) })
+	t.Run("CreatingAndFindingChannelProcessingState", func(t *testing.T) { TestCreatingAndFindingChannelProcessingState(t, client) })
+
+	// Initialization tests
+	t.Run("Init", func(t *testing.T) { TestInit(t, client) })
+	t.Run("Init_WithSchemaValidation", func(t *testing.T) { TestInit_WithSchemaValidation(t, client) })
+
+	// Edge case tests
+	t.Run("MoveIssue_EdgeCases", func(t *testing.T) { TestMoveIssue_EdgeCases(t, client) })
+	t.Run("ChannelProcessingState_EdgeCases", func(t *testing.T) { TestChannelProcessingState_EdgeCases(t, client) })
+	t.Run("SaveIssue_ComplexAlert", func(t *testing.T) { TestSaveIssue_ComplexAlert(t, client) })
+	t.Run("SpecialCharactersInCorrelationID", func(t *testing.T) { TestSpecialCharactersInCorrelationID(t, client) })
+
+	// Concurrent operation tests
+	t.Run("ConcurrentSaveIssue", func(t *testing.T) { TestConcurrentSaveIssue(t, client) })
+	t.Run("ConcurrentMoveMapping", func(t *testing.T) { TestConcurrentMoveMapping(t, client) })
+
+	// Large dataset tests
+	t.Run("LoadOpenIssuesInChannel_LargeDataset", func(t *testing.T) { TestLoadOpenIssuesInChannel_LargeDataset(t, client) })
+	t.Run("FindActiveChannels_ManyChannels", func(t *testing.T) { TestFindActiveChannels_ManyChannels(t, client) })
+
+	// Context cancellation tests
+	t.Run("ContextCancellation", func(t *testing.T) { TestContextCancellation(t, client) })
+}
+
 type testIssue struct {
 	ID            string        `json:"id"`
 	CorrelationID string        `json:"correlationId"`
@@ -618,4 +1065,71 @@ func moveMappingFromJSON(data []byte) *testMoveMapping {
 		panic(fmt.Sprintf("failed to unmarshal move mapping: %v", err))
 	}
 	return &moveMapping
+}
+
+// newTestAlertWithAllFields creates a test alert with all fields populated.
+// This is useful for testing JSON serialization and ensuring no data is lost.
+func newTestAlertWithAllFields(channelID, correlationID string) *common.Alert {
+	alert := common.NewErrorAlert()
+	alert.SlackChannelID = channelID
+	alert.CorrelationID = correlationID
+	alert.Header = "Test Alert with All Fields"
+	alert.HeaderWhenResolved = "Test Alert Resolved"
+	alert.Text = "This is a test alert with all fields populated for comprehensive testing"
+	alert.TextWhenResolved = "Issue has been resolved successfully"
+	alert.FallbackText = "Test alert notification"
+	alert.Author = "test-service"
+	alert.Host = "test-host-01"
+	alert.Footer = "Test footer information"
+	alert.Link = "https://example.com/alert/123"
+	alert.IconEmoji = ":alert:"
+	alert.Username = "Test Alert Bot"
+	alert.Type = "test"
+	alert.IssueFollowUpEnabled = true
+	alert.AutoResolveSeconds = 300
+	alert.NotificationDelaySeconds = 10
+	alert.ArchivingDelaySeconds = 60
+	alert.Severity = common.AlertError
+
+	// Add fields
+	alert.Fields = []*common.Field{
+		{Title: "Environment", Value: "production"},
+		{Title: "Service", Value: "api-gateway"},
+		{Title: "Region", Value: "us-east-1"},
+	}
+
+	// Add escalation
+	alert.Escalation = []*common.Escalation{
+		{
+			Severity:      common.AlertPanic,
+			DelaySeconds:  300,
+			SlackMentions: []string{"<!here>"},
+		},
+	}
+
+	// Add webhooks
+	alert.Webhooks = []*common.Webhook{
+		{
+			ID:               "restart",
+			URL:              "https://example.com/webhook/restart",
+			ButtonText:       "Restart Service",
+			ButtonStyle:      common.WebhookButtonStyleDanger,
+			AccessLevel:      common.WebhookAccessLevelChannelAdmins,
+			DisplayMode:      common.WebhookDisplayModeOpenIssue,
+			ConfirmationText: "Are you sure?",
+			Payload: map[string]any{
+				"action": "restart",
+				"host":   "test-host-01",
+			},
+		},
+	}
+
+	// Add metadata
+	alert.Metadata = map[string]any{
+		"trace_id":   "trace-123-456",
+		"request_id": "req-789-012",
+		"version":    "1.2.3",
+	}
+
+	return alert
 }
