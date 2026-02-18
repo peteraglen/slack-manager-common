@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-18
+
+### Added
+- Concurrency control in CI: cancel outdated workflow runs when new commits are pushed to the same ref
+
+### Changed
+- Standardize on `google/uuid`, remove `ksuid` dependency
+- Expand dbtests with comprehensive test coverage
+- Clarify in README when to use this library directly
+- Update README license section
+- Reduce CI test output verbosity: remove `-v` flag, show per-package coverage instead of per-function
+- Simplify CI to test only Go 1.25
+- Pin all GitHub Actions to specific versions
+
+### Fixed
+- Fix lint issues flagged by golangci-lint
+- Fix golangci-lint v2 incompatibility (`--out-format` flag removed, output format configured in `.golangci.yaml`)
+
 ## [0.2.0] - 2026-02-18
 
 ### Added
@@ -23,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 See git history for changes in v0.1.4 and earlier versions.
 
-[Unreleased]: https://github.com/peteraglen/slack-manager-common/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/peteraglen/slack-manager-common/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/peteraglen/slack-manager-common/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/peteraglen/slack-manager-common/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/peteraglen/slack-manager-common/releases/tag/v0.1.4
