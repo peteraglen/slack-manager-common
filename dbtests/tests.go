@@ -9,7 +9,7 @@ import (
 	"time"
 
 	common "github.com/peteraglen/slack-manager-common"
-	"github.com/segmentio/ksuid"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,8 +17,8 @@ import (
 func TestSaveAlert(t *testing.T, client common.DB) {
 	ctx := context.Background()
 
-	alert1 := newTestAlert("C0ABABABAB", ksuid.New().String())
-	alert2 := newTestAlert("C0ABABABAB", ksuid.New().String())
+	alert1 := newTestAlert("C0ABABABAB", uuid.New().String())
+	alert2 := newTestAlert("C0ABABABAB", uuid.New().String())
 
 	err := client.SaveAlert(ctx, alert1)
 	require.NoError(t, err, "failed to save alert1")
@@ -42,13 +42,13 @@ func TestSaveIssue(t *testing.T, client common.DB) {
 	err := client.SaveIssue(ctx, nil)
 	require.Error(err, "should fail to save nil issue")
 
-	corr1 := ksuid.New().String()
+	corr1 := uuid.New().String()
 	alert1 := newTestAlert(channel, corr1)
-	issue1 := newTestIssue(alert1, ksuid.New().String())
+	issue1 := newTestIssue(alert1, uuid.New().String())
 
-	corr2 := ksuid.New().String()
+	corr2 := uuid.New().String()
 	alert2 := newTestAlert(channel, corr2)
-	issue2 := newTestIssue(alert2, ksuid.New().String())
+	issue2 := newTestIssue(alert2, uuid.New().String())
 
 	err = client.SaveIssue(ctx, issue1)
 	require.NoError(err)
@@ -71,7 +71,7 @@ func TestSaveIssue(t *testing.T, client common.DB) {
 	assert.Equal(t, issue2.SlackPostID, foundIssue.SlackPostID, "SlackPostID should match after saving")
 
 	// Saving the same issue again should update the existing issue
-	issue1.SlackPostID = ksuid.New().String() // Simulate a change in SlackPostID
+	issue1.SlackPostID = uuid.New().String() // Simulate a change in SlackPostID
 	err = client.SaveIssue(ctx, issue1)
 	require.NoError(err)
 	id, issueBody, err = client.FindOpenIssueByCorrelationID(ctx, channel, corr1)
@@ -90,13 +90,13 @@ func TestMoveIssue(t *testing.T, client common.DB) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	corr1 := ksuid.New().String()
+	corr1 := uuid.New().String()
 	alert1 := newTestAlert(channel1, corr1)
-	issue1 := newTestIssue(alert1, ksuid.New().String())
+	issue1 := newTestIssue(alert1, uuid.New().String())
 
-	corr2 := ksuid.New().String()
+	corr2 := uuid.New().String()
 	alert2 := newTestAlert(channel1, corr2)
-	issue2 := newTestIssue(alert2, ksuid.New().String())
+	issue2 := newTestIssue(alert2, uuid.New().String())
 
 	err := client.SaveIssues(ctx, issue1, issue2)
 	require.NoError(err)
@@ -145,9 +145,9 @@ func TestFindOpenIssueByCorrelationID(t *testing.T, client common.DB) {
 	_, _, err = client.FindOpenIssueByCorrelationID(ctx, channel, "")
 	require.Error(err, "should fail to find issue with empty correlation ID")
 
-	correlationID := ksuid.New().String()
+	correlationID := uuid.New().String()
 	alert := newTestAlert(channel, correlationID)
-	issue := newTestIssue(alert, ksuid.New().String())
+	issue := newTestIssue(alert, uuid.New().String())
 
 	// Lookup by correlation ID before saving should return nil
 	id, issueBody, err := client.FindOpenIssueByCorrelationID(ctx, channel, correlationID)
@@ -174,9 +174,9 @@ func TestFindOpenIssueByCorrelationID(t *testing.T, client common.DB) {
 	assert.Equal(issue.SlackPostID, foundIssue.SlackPostID)
 
 	// An archived issue should not be found
-	correlationIDArchived := ksuid.New().String()
+	correlationIDArchived := uuid.New().String()
 	alertArchived := newTestAlert(channel, correlationIDArchived)
-	issueArchived := newTestIssue(alertArchived, ksuid.New().String())
+	issueArchived := newTestIssue(alertArchived, uuid.New().String())
 	issueArchived.Archived = true
 	err = client.SaveIssue(ctx, issueArchived)
 	require.NoError(err, "should not error when saving archived issue")
@@ -198,8 +198,8 @@ func TestFindIssueBySlackPostID(t *testing.T, client common.DB) {
 	_, _, err = client.FindIssueBySlackPostID(ctx, channel, "")
 	require.Error(err, "should fail to find issue with empty SlackPostID")
 
-	alert := newTestAlert(channel, ksuid.New().String())
-	postID := ksuid.New().String()
+	alert := newTestAlert(channel, uuid.New().String())
+	postID := uuid.New().String()
 	issue := newTestIssue(alert, postID)
 
 	// Lookup by SlackPostID before saving should return nil
@@ -227,7 +227,7 @@ func TestFindIssueBySlackPostID(t *testing.T, client common.DB) {
 	assert.Equal(issue.SlackPostID, foundIssue.SlackPostID)
 
 	// Saving the same issue again should update the existing issue
-	newPostID := ksuid.New().String()
+	newPostID := uuid.New().String()
 	issue.SlackPostID = newPostID // Simulate a change in SlackPostID
 	err = client.SaveIssue(ctx, issue)
 	require.NoError(err, "should not error when updating issue with new SlackPostID")
@@ -264,9 +264,9 @@ func TestSaveIssues(t *testing.T, client common.DB) {
 	err = client.SaveIssues(ctx)
 	require.NoError(err, "should not error when updating with empty issues list")
 
-	issue1 := newTestIssue(newTestAlert(channel, ksuid.New().String()), ksuid.New().String())
-	issue2 := newTestIssue(newTestAlert(channel, ksuid.New().String()), ksuid.New().String())
-	issue3 := newTestIssue(newTestAlert(channel, ksuid.New().String()), ksuid.New().String())
+	issue1 := newTestIssue(newTestAlert(channel, uuid.New().String()), uuid.New().String())
+	issue2 := newTestIssue(newTestAlert(channel, uuid.New().String()), uuid.New().String())
+	issue3 := newTestIssue(newTestAlert(channel, uuid.New().String()), uuid.New().String())
 
 	// Save the issues
 	err = client.SaveIssues(ctx, issue1, issue2, issue3)
@@ -293,11 +293,11 @@ func TestFindActiveChannels(t *testing.T, client common.DB) {
 	err = client.Init(ctx, true)
 	require.NoError(err, "should not error when initializing client")
 
-	issue1 := newTestIssue(newTestAlert(channel1, ksuid.New().String()), ksuid.New().String())
-	issue2 := newTestIssue(newTestAlert(channel2, ksuid.New().String()), ksuid.New().String())
-	issue2a := newTestIssue(newTestAlert(channel2, ksuid.New().String()), ksuid.New().String())
-	issue3 := newTestIssue(newTestAlert(channel3, ksuid.New().String()), ksuid.New().String())
-	issue3a := newTestIssue(newTestAlert(channel3, ksuid.New().String()), ksuid.New().String())
+	issue1 := newTestIssue(newTestAlert(channel1, uuid.New().String()), uuid.New().String())
+	issue2 := newTestIssue(newTestAlert(channel2, uuid.New().String()), uuid.New().String())
+	issue2a := newTestIssue(newTestAlert(channel2, uuid.New().String()), uuid.New().String())
+	issue3 := newTestIssue(newTestAlert(channel3, uuid.New().String()), uuid.New().String())
+	issue3a := newTestIssue(newTestAlert(channel3, uuid.New().String()), uuid.New().String())
 	issue3.Archived = true // Mark one issue as archived
 
 	// Save the issues
@@ -336,10 +336,10 @@ func TestLoadOpenIssuesInChannel(t *testing.T, client common.DB) {
 	err = client.Init(ctx, true)
 	require.NoError(err, "should not error when initializing client")
 
-	issue1 := newTestIssue(newTestAlert(channel1, ksuid.New().String()), ksuid.New().String())
-	issue2 := newTestIssue(newTestAlert(channel1, ksuid.New().String()), ksuid.New().String())
-	issue3 := newTestIssue(newTestAlert(channel2, ksuid.New().String()), ksuid.New().String())
-	issue4 := newTestIssue(newTestAlert(channel2, ksuid.New().String()), ksuid.New().String())
+	issue1 := newTestIssue(newTestAlert(channel1, uuid.New().String()), uuid.New().String())
+	issue2 := newTestIssue(newTestAlert(channel1, uuid.New().String()), uuid.New().String())
+	issue3 := newTestIssue(newTestAlert(channel2, uuid.New().String()), uuid.New().String())
+	issue4 := newTestIssue(newTestAlert(channel2, uuid.New().String()), uuid.New().String())
 	issue4.Archived = true // Mark one issue as archived
 
 	// Save the issues for channel1
@@ -375,7 +375,7 @@ func TestCreatingAndFindingMoveMappings(t *testing.T, client common.DB) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	correlationID := ksuid.New().String()
+	correlationID := uuid.New().String()
 	originalChannelID := "C0ABABABAB"
 	targetChannelID := "C0ABABABAC"
 
@@ -432,7 +432,7 @@ func TestDeletingMoveMappings(t *testing.T, client common.DB) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	correlationID := ksuid.New().String()
+	correlationID := uuid.New().String()
 	originalChannelID := "C0ABABABAB"
 	targetChannelID := "C0ABABABAC"
 
