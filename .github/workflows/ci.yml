@@ -43,9 +43,11 @@ jobs:
 
     - name: Run tests
       run: |
-        go test -v -race -coverprofile=coverage.out ./...
+        go test -race -cover ./... 2>&1 | tee /tmp/test-output.txt
+        test_exit=${PIPESTATUS[0]}
         echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
-        go tool cover -func=coverage.out >> $GITHUB_STEP_SUMMARY
+        grep "coverage:" /tmp/test-output.txt >> $GITHUB_STEP_SUMMARY || true
+        exit $test_exit
 
   lint:
     name: Lint
