@@ -117,6 +117,11 @@ func TestMoveIssue(t *testing.T, client types.DB) {
 	assert := assert.New(t)
 	require := require.New(t)
 
+	err := client.DropAllData(ctx)
+	require.NoError(err, "should not error when dropping all data before test")
+	err = client.Init(ctx, true)
+	require.NoError(err, "should not error when initializing client before test")
+
 	corr1 := uuid.New().String()
 	alert1 := newTestAlert(channel1, corr1)
 	issue1 := newTestIssue(alert1, uuid.New().String())
@@ -125,7 +130,7 @@ func TestMoveIssue(t *testing.T, client types.DB) {
 	alert2 := newTestAlert(channel1, corr2)
 	issue2 := newTestIssue(alert2, uuid.New().String())
 
-	err := client.SaveIssues(ctx, issue1, issue2)
+	err = client.SaveIssues(ctx, issue1, issue2)
 	require.NoError(err)
 	issuesChannel1, err := client.LoadOpenIssuesInChannel(ctx, channel1)
 	require.NoError(err, "should not error when loading open issues")
@@ -630,9 +635,10 @@ func TestConcurrentSaveIssue(t *testing.T, client types.DB) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			// Each goroutine updates the issue with a different post ID
-			issue.SlackPostID = fmt.Sprintf("post-%d-%s", index, uuid.New().String())
-			if err := client.SaveIssue(ctx, issue); err != nil {
+			// Each goroutine updates a copy of the issue with a different post ID
+			issueCopy := *issue
+			issueCopy.SlackPostID = fmt.Sprintf("post-%d-%s", index, uuid.New().String())
+			if err := client.SaveIssue(ctx, &issueCopy); err != nil {
 				errors <- err
 			}
 		}(i)
