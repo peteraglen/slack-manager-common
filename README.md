@@ -1,4 +1,4 @@
-# types
+# slackmgr/types
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/slackmgr/types.svg)](https://pkg.go.dev/github.com/slackmgr/types)
 [![Go Report Card](https://goreportcard.com/badge/github.com/slackmgr/types)](https://goreportcard.com/report/github.com/slackmgr/types)
